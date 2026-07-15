@@ -26,8 +26,10 @@
 * Reuse SiYuan variables and native component classes.
 * Keep the interface quiet, compact, and free of decorative gradients or heavy shadows.
 * Support light and dark modes without changing global appearance settings.
+* In SiYuan `Setting`, use `direction: "row"` for full-width stacked controls; avoid placing custom full-width containers in `direction: "column"`, which produces oversized mobile layouts.
 
 ## Verification
 
 * Run `pnpm check` and `git diff --check` before publishing changes.
 * Verify data mutations against a disposable test block before a release.
+* For local runtime verification, back up the served plugin assets, upload the built `dist/` assets through `/api/file/putFile`, and reload with `/api/petal/setPetalEnabled`; verify the served bytes and enabled state after reload. Do not copy files directly into the workspace.

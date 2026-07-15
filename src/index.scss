@@ -68,6 +68,62 @@
   }
 }
 
+.stillmark-daily-setting {
+  width: 100%;
+  min-width: 0;
+}
+
+.stillmark-daily-setting__control {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.stillmark-daily-setting__message {
+  margin-top: 6px;
+  color: var(--b3-theme-on-surface);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+
+  &[data-type="error"] {
+    color: var(--b3-theme-error);
+  }
+}
+
+.stillmark-daily-setting__template-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stillmark-daily-setting__template-name {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stillmark-daily-setting__template-row .b3-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.stillmark-daily-setting__template-file-label {
+  margin: 8px 0 4px;
+}
+
+@media (max-width: 600px) {
+  .stillmark-daily-setting__template-row {
+    flex-wrap: wrap;
+  }
+
+  .stillmark-daily-setting__template-name {
+    flex-basis: 100%;
+  }
+}
+
 .protyle-wysiwyg [data-node-id][custom-stillmark-role] {
   border-radius: 6px;
   background: color-mix(in srgb, var(--stillmark-role-color) 5%, transparent);

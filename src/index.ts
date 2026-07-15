@@ -6,6 +6,7 @@ import {
     getFrontend,
     showMessage,
 } from "siyuan";
+import {DailyNotesFeature} from "./daily-notes";
 import "./index.scss";
 
 const ROLE_ATTRIBUTE = "custom-stillmark-role";
@@ -32,6 +33,8 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 ];
 
 export default class StillmarkWorkbench extends Plugin {
+    private dailyNotes?: DailyNotesFeature;
+
     private readonly blockMenuHandler = ({detail}: CustomEvent<BlockMenuDetail>) => {
         detail.menu.addItem({
             id: "stillmark-workbench-block-role",
@@ -70,6 +73,9 @@ export default class StillmarkWorkbench extends Plugin {
         });
 
         this.eventBus.on("click-blockicon", this.blockMenuHandler);
+
+        this.dailyNotes = new DailyNotesFeature(this);
+        this.dailyNotes.onload();
     }
 
     onLayoutReady() {
@@ -79,10 +85,13 @@ export default class StillmarkWorkbench extends Plugin {
             position: "right",
             callback: () => this.openWorkbench(),
         });
+
+        this.dailyNotes?.onLayoutReady();
     }
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockMenuHandler);
+        this.dailyNotes?.onunload();
     }
 
     private openWorkbench() {
