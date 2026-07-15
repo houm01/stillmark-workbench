@@ -17,7 +17,6 @@
     "**/dist",
     "**/pnpm-lock.yaml",
     "index.js",
-    "kernel.js",
     "index.css"
   ],
   "typescript": {
