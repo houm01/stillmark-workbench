@@ -5,6 +5,11 @@
 * This repository contains the Stillmark Workbench plugin for SiYuan Note.
 * Keep tools independent and small; shared shell code belongs in `src/` and tool-specific logic should be split into focused modules as it grows.
 
+## Workflow
+
+* Do not use Superpowers skills, workflows, or document templates in this repository.
+* Keep project plans and specifications in neutral project-owned paths such as `docs/plans/` and `docs/specs/` when they are needed.
+
 ## Git
 
 * Do not modify `main` directly. Work on `feature/*` branches and merge through a pull request.
