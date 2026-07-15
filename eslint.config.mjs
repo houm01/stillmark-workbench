@@ -20,7 +20,6 @@ export default [
             "dist",
             "node_modules",
             "index.js",
-            "kernel.js",
         ],
     },
     ...compat.extends("eslint:recommended", "plugin:@typescript-eslint/recommended"),

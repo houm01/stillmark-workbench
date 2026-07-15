@@ -29,7 +29,6 @@ module.exports = (env, argv) => {
                     {from: "README*.md", to: "./dist/"},
                     {from: "plugin.json", to: "./dist/"},
                     {from: "src/i18n/", to: "./dist/i18n/"},
-                    {from: "dist/kernel.js", to: "./dist/"},
                 ],
             }),
         );

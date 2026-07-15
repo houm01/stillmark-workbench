@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <rect width="1024" height="768" fill="#f4f2f0"/>
+  <rect x="72" y="70" width="880" height="628" rx="18" fill="#ffffff" stroke="#d8d3cf" stroke-width="2"/>
+  <rect x="72" y="70" width="880" height="58" rx="18" fill="#faf9f8"/>
+  <path d="M72 110h880" stroke="#e5e1de" stroke-width="2"/>
+  <rect x="112" y="92" width="150" height="14" rx="7" fill="#cbc6c2"/>
+  <rect x="774" y="88" width="30" height="22" rx="6" fill="#f1dddf"/>
+  <rect x="822" y="88" width="30" height="22" rx="6" fill="#ece9e7"/>
+  <rect x="870" y="88" width="30" height="22" rx="6" fill="#ece9e7"/>
+  <text x="132" y="196" fill="#242220" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="28" font-weight="600">Stillmark Workbench</text>
+  <text x="132" y="230" fill="#77716d" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="17">Focused tools for SiYuan Note</text>
+  <rect x="132" y="274" width="760" height="238" rx="12" fill="#fbfaf9" stroke="#d8d3cf" stroke-width="2"/>
+  <text x="164" y="322" fill="#242220" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="21" font-weight="600">Semantic block roles</text>
+  <text x="164" y="354" fill="#77716d" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="16">Assign reusable roles without changing block content.</text>
+  <rect x="164" y="393" width="78" height="34" rx="7" fill="#ffffff" stroke="#c8d7e8"/>
+  <rect x="254" y="393" width="64" height="34" rx="7" fill="#ffffff" stroke="#d9cfea"/>
+  <rect x="330" y="393" width="96" height="34" rx="7" fill="#ffffff" stroke="#ead7b9"/>
+  <rect x="438" y="393" width="94" height="34" rx="7" fill="#ffffff" stroke="#e6c6ca"/>
+  <rect x="544" y="393" width="82" height="34" rx="7" fill="#ffffff" stroke="#d9d5d2"/>
+  <text x="184" y="416" fill="#3b6ea8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Note</text>
+  <text x="274" y="416" fill="#7656a8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Tip</text>
+  <text x="350" y="416" fill="#a56a14" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Warning</text>
+  <text x="458" y="416" fill="#b42335" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Important</text>
+  <text x="564" y="416" fill="#6f6b68" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Muted</text>
+  <path d="M164 464h696" stroke="#e5e1de"/>
+  <text x="164" y="490" fill="#77716d" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">Open a block menu to apply or clear a role.</text>
+</svg>
