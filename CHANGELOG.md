@@ -4,6 +4,8 @@ This file records user-visible changes to Stillmark Workbench.
 
 ## Unreleased
 
+## 0.2.0 — 2026-07-16
+
 ### Added
 
 * Add a dedicated daily-note top-bar button for opening today's note.
