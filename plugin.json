@@ -2,7 +2,7 @@
   "name": "stillmark-workbench",
   "author": "houm01",
   "url": "https://github.com/houm01/stillmark-workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minAppVersion": "3.7.0",
   "kernels": [
     "windows",
