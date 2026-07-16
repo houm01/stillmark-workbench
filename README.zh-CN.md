@@ -1,8 +1,18 @@
-[English](README.md)
+<p align="center">
+  <img src="icon.png" width="96" height="96" alt="静痕工作台图标">
+</p>
 
-# 静痕工作台
+<h1 align="center">静痕工作台</h1>
 
-静痕工作台是一组安静、克制、专注的思源笔记实用工具。
+<p align="center">一组安静、克制、专注的思源笔记实用工具。</p>
+
+<p align="center">
+  <a href="https://github.com/houm01/stillmark-workbench/releases/latest"><img src="https://img.shields.io/github/v/release/houm01/stillmark-workbench?style=flat-square&amp;color=b42335" alt="最新版本"></a>
+  <a href="https://github.com/siyuan-note/siyuan"><img src="https://img.shields.io/badge/SiYuan-%E2%89%A5%203.7.0-b42335?style=flat-square" alt="思源笔记 3.7.0 或更高版本"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/houm01/stillmark-workbench?style=flat-square&amp;color=6f6b68" alt="MIT 许可证"></a>
+</p>
+
+<p align="center"><a href="README.md">English</a></p>
 
 ## 当前工具
 

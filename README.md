@@ -1,8 +1,18 @@
-[简体中文](README.zh-CN.md)
+<p align="center">
+  <img src="icon.png" width="96" height="96" alt="Stillmark Workbench icon">
+</p>
 
-# Stillmark Workbench
+<h1 align="center">Stillmark Workbench</h1>
 
-Stillmark Workbench is a quiet collection of focused tools for SiYuan Note.
+<p align="center">A quiet collection of focused tools for SiYuan Note.</p>
+
+<p align="center">
+  <a href="https://github.com/houm01/stillmark-workbench/releases/latest"><img src="https://img.shields.io/github/v/release/houm01/stillmark-workbench?style=flat-square&amp;color=b42335" alt="Latest release"></a>
+  <a href="https://github.com/siyuan-note/siyuan"><img src="https://img.shields.io/badge/SiYuan-%E2%89%A5%203.7.0-b42335?style=flat-square" alt="SiYuan 3.7.0 or later"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/houm01/stillmark-workbench?style=flat-square&amp;color=6f6b68" alt="MIT license"></a>
+</p>
+
+<p align="center"><a href="README.zh-CN.md">简体中文</a></p>
 
 ## Available tools
 
