@@ -1,12 +1,15 @@
 import {
-    Dialog,
     Menu,
     Plugin,
     fetchSyncPost,
-    getFrontend,
     showMessage,
 } from "siyuan";
 import {DailyNotesFeature} from "./daily-notes";
+import {DocumentFindFeature} from "./document-find";
+import {DocumentTreeFocusFeature} from "./document-tree-focus";
+import {FontSwitcherFeature} from "./font-switcher";
+import {PdfExportFeature} from "./pdf-export";
+import {WorkbenchDialogFeature} from "./workbench-dialog";
 import "./index.scss";
 
 const ROLE_ATTRIBUTE = "custom-stillmark-role";
@@ -34,6 +37,11 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 
 export default class StillmarkWorkbench extends Plugin {
     private dailyNotes?: DailyNotesFeature;
+    private documentFind?: DocumentFindFeature;
+    private documentTreeFocus?: DocumentTreeFocusFeature;
+    private fontSwitcher?: FontSwitcherFeature;
+    private pdfExport?: PdfExportFeature;
+    private workbench?: WorkbenchDialogFeature;
 
     private readonly blockMenuHandler = ({detail}: CustomEvent<BlockMenuDetail>) => {
         detail.menu.addItem({
@@ -69,57 +77,54 @@ export default class StillmarkWorkbench extends Plugin {
         this.addCommand({
             langKey: "openWorkbench",
             hotkey: "⌥⇧W",
-            callback: () => this.openWorkbench(),
+            callback: () => {
+                void this.workbench?.open();
+            },
         });
 
         this.eventBus.on("click-blockicon", this.blockMenuHandler);
 
         this.dailyNotes = new DailyNotesFeature(this);
         this.dailyNotes.onload();
+
+        this.documentFind = new DocumentFindFeature(this);
+        this.documentFind.onload();
+
+        this.documentTreeFocus = new DocumentTreeFocusFeature(this, this.dailyNotes);
+        this.documentTreeFocus.onload();
+
+        this.fontSwitcher = new FontSwitcherFeature(this);
+        this.fontSwitcher.onload();
+
+        this.pdfExport = new PdfExportFeature(this);
+        this.pdfExport.onload();
+
+        this.workbench = new WorkbenchDialogFeature(this, this.dailyNotes, this.fontSwitcher, this.pdfExport);
     }
 
     onLayoutReady() {
-        this.addTopBar({
+        const topBarElement = this.addTopBar({
             icon: "iconStillmarkWorkbench",
             title: this.i18n.openWorkbench,
             position: "right",
-            callback: () => this.openWorkbench(),
+            callback: () => {
+                void this.workbench?.open();
+            },
         });
+        topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--workbench");
 
         this.dailyNotes?.onLayoutReady();
+        this.documentTreeFocus?.onLayoutReady();
+        this.fontSwitcher?.onLayoutReady();
+        this.pdfExport?.onLayoutReady();
     }
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockMenuHandler);
+        this.documentFind?.onunload();
+        this.documentTreeFocus?.onunload();
+        this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
-    }
-
-    private openWorkbench() {
-        const frontend = getFrontend();
-        const isMobile = frontend === "mobile" || frontend === "browser-mobile";
-
-        new Dialog({
-            title: this.i18n.workbenchTitle,
-            content: `<div class="b3-dialog__content stillmark-workbench">
-    <section class="stillmark-workbench__tool">
-        <div class="stillmark-workbench__tool-header">
-            <div>
-                <div class="stillmark-workbench__tool-name">${this.i18n.blockRoles}</div>
-                <div class="stillmark-workbench__tool-description">${this.i18n.blockRolesDescription}</div>
-            </div>
-            <span class="stillmark-workbench__status">${this.i18n.available}</span>
-        </div>
-        <div class="stillmark-workbench__roles" aria-label="${this.i18n.blockRoles}">
-            ${
-                ROLE_DEFINITIONS.map((role) => `<span data-role="${role.value}">${this.i18n[role.labelKey]}</span>`)
-                    .join("")
-            }
-        </div>
-        <div class="stillmark-workbench__usage">${this.i18n.blockRolesUsage}</div>
-    </section>
-</div>`,
-            width: isMobile ? "92vw" : "520px",
-        });
     }
 
     private async applyBlockRole(blockElements: HTMLElement[], role: BlockRole | null) {

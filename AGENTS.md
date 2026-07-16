@@ -26,7 +26,14 @@
 * Reuse SiYuan variables and native component classes.
 * Keep the interface quiet, compact, and free of decorative gradients or heavy shadows.
 * Support light and dark modes without changing global appearance settings.
+* Give plugin-owned top-bar icons restrained, distinct accent colors instead of leaving them monochrome.
+* Anchor top-bar context menus below the triggering button instead of opening entirely to its left; leave enough vertical clearance for the native tooltip.
+* Floating tools launched from the workbench must anchor to the clicked workbench control, not to a separate top-bar shortcut.
+* Settings opened from the workbench should provide a direct return action and reopen the workbench after a successful save.
+* Current-document search matches use yellow backgrounds; keep the active match more saturated than the other matches.
 * In SiYuan `Setting`, use `direction: "row"` for full-width stacked controls; avoid placing custom full-width containers in `direction: "column"`, which produces oversized mobile layouts.
+* PDF export follows the current editor font by default, allows choosing an installed system font for the current export, and includes H1-H3 bookmarks in the PDF reader's sidebar outline by default without inserting a contents page into the body.
+* PDF export must generate PDF bytes through SiYuan desktop's print-to-PDF bridge and save them with a native file dialog; never invoke the system printer.
 
 ## Verification
 

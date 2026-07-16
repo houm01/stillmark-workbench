@@ -45,5 +45,9 @@
     "webpack": "^5.107.2",
     "webpack-cli": "^7.0.3",
     "zip-webpack-plugin": "^4.0.3"
+  },
+  "dependencies": {
+    "@lillallol/outline-pdf": "4.0.0",
+    "pdf-lib": "1.17.1"
   }
 }

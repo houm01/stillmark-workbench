@@ -64,6 +64,10 @@ module.exports = (env, argv) => {
             },
         },
         externals: {
+            electron: "commonjs electron",
+            "node:fs/promises": "commonjs node:fs/promises",
+            "node:os": "commonjs node:os",
+            "node:path": "commonjs node:path",
             siyuan: "siyuan",
         },
         entry: {
