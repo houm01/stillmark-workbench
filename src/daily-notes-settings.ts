@@ -17,6 +17,8 @@ interface DailyNotesPluginData {
     templateDocumentId?: string;
     templateDocumentTitle?: string;
     autoCreateOnStartup?: boolean;
+    autoLocateInTreeOnOpen?: boolean;
+    autoFocusOnOpen?: boolean;
 }
 
 export interface Notebook {
@@ -56,11 +58,14 @@ export class DailyNotesSettings {
     private templateDocument: TemplateDocument | null = null;
     private draftTemplateDocument: TemplateDocument | null = null;
     private autoCreateOnStartup = false;
+    private autoLocateInTreeOnOpen = false;
     private readyPromise: Promise<void> = Promise.resolve();
     private notebookRequestGeneration = 0;
     private notebookConfRequestGeneration = 0;
     private loadedSettingsNotebookId = "";
     private saveRequested = false;
+    private returnToWorkbench?: () => void;
+    private returnButton?: HTMLButtonElement;
 
     private readonly notebookSelect = document.createElement("select");
     private readonly rootInput = document.createElement("input");
@@ -70,6 +75,7 @@ export class DailyNotesSettings {
     private readonly useCurrentPageButton = document.createElement("button");
     private readonly clearTemplatePageButton = document.createElement("button");
     private readonly autoCreateInput = document.createElement("input");
+    private readonly autoLocateInTreeInput = document.createElement("input");
 
     private readonly notebookChangedHandler = () => {
         void this.refreshNotebookOptions();
@@ -118,6 +124,10 @@ export class DailyNotesSettings {
         this.autoCreateInput.className = "b3-switch";
         this.autoCreateInput.setAttribute("aria-label", this.plugin.i18n.dailyNotesAutoCreate);
 
+        this.autoLocateInTreeInput.type = "checkbox";
+        this.autoLocateInTreeInput.className = "b3-switch";
+        this.autoLocateInTreeInput.setAttribute("aria-label", this.plugin.i18n.documentTreeAutoFocus);
+
         this.setSettingInputsEnabled(false);
     }
 
@@ -133,10 +143,61 @@ export class DailyNotesSettings {
         this.plugin.eventBus.off("closed-notebook", this.notebookChangedHandler);
     }
 
-    open() {
+    open(returnToWorkbench?: () => void) {
+        this.returnButton?.remove();
+        this.returnButton = undefined;
+        this.returnToWorkbench = returnToWorkbench;
         this.resetDraftFromPersisted();
         void this.refreshNotebookOptions();
         this.plugin.openSetting();
+        if (returnToWorkbench) {
+            this.mountReturnButton(returnToWorkbench);
+        }
+    }
+
+    openDailyNotesSettings(returnToWorkbench?: () => void) {
+        this.openAndFocus(this.notebookSelect, returnToWorkbench);
+    }
+
+    openDocumentTreeFocusSettings(returnToWorkbench?: () => void) {
+        this.openAndFocus(this.autoLocateInTreeInput, returnToWorkbench);
+    }
+
+    private openAndFocus(element: HTMLElement, returnToWorkbench?: () => void) {
+        this.open(returnToWorkbench);
+        window.setTimeout(() => {
+            element.scrollIntoView({block: "center"});
+            element.focus({preventScroll: true});
+        }, 100);
+    }
+
+    private mountReturnButton(returnToWorkbench: () => void, attempt = 0) {
+        window.setTimeout(() => {
+            if (this.returnToWorkbench !== returnToWorkbench) {
+                return;
+            }
+
+            const dialog = window.siyuan.dialogs.find((item) => item.element.contains(this.notebookSelect));
+            const action = dialog?.element.querySelector<HTMLElement>(".b3-dialog__action");
+            if (!dialog || !action) {
+                if (attempt < 4) {
+                    this.mountReturnButton(returnToWorkbench, attempt + 1);
+                }
+                return;
+            }
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "b3-button b3-button--cancel stillmark-setting-return";
+            button.textContent = this.plugin.i18n.returnToWorkbench;
+            button.addEventListener("click", () => {
+                this.returnToWorkbench = undefined;
+                dialog.destroy();
+                window.setTimeout(returnToWorkbench);
+            });
+            action.prepend(button);
+            this.returnButton = button;
+        }, attempt === 0 ? 0 : 50);
     }
 
     async resolveNotebook(): Promise<ConfiguredNotebookResult> {
@@ -153,6 +214,34 @@ export class DailyNotesSettings {
     async shouldAutoCreateOnStartup() {
         await this.readyPromise;
         return this.autoCreateOnStartup;
+    }
+
+    async shouldAutoLocateInTreeOnOpen() {
+        await this.readyPromise;
+        return this.autoLocateInTreeOnOpen;
+    }
+
+    async setAutoLocateInTreeOnOpen(enabled: boolean) {
+        await this.readyPromise;
+        const stored = await this.plugin.loadData(STORAGE_NAME) as DailyNotesPluginData | undefined;
+        const nextPluginData: DailyNotesPluginData = {
+            ...(stored ?? {}),
+            autoLocateInTreeOnOpen: enabled,
+        };
+        delete nextPluginData.autoFocusOnOpen;
+
+        const response = await this.plugin.saveData(STORAGE_NAME, nextPluginData);
+        if (response.code !== 0) {
+            throw new Error(response.msg || this.plugin.i18n.documentTreeAutoFocusSaveFailed);
+        }
+
+        const readback = await this.plugin.loadData(STORAGE_NAME) as DailyNotesPluginData | undefined;
+        if (readback?.autoLocateInTreeOnOpen !== enabled) {
+            throw new Error(this.plugin.i18n.documentTreeAutoFocusVerificationFailed);
+        }
+
+        this.autoLocateInTreeOnOpen = enabled;
+        this.autoLocateInTreeInput.checked = enabled;
     }
 
     async refreshPageTemplate(notebookId: string) {
@@ -187,11 +276,27 @@ export class DailyNotesSettings {
                     this.resetDraftFromPersisted();
                 }
                 this.saveRequested = false;
+                this.returnButton?.remove();
+                this.returnButton = undefined;
+                this.returnToWorkbench = undefined;
             },
             confirmCallback: () => {
+                const returnToWorkbench = this.returnToWorkbench;
+                this.returnToWorkbench = undefined;
                 this.saveRequested = true;
-                void this.saveSettings();
+                void this.saveSettings().then((saved) => {
+                    if (saved && returnToWorkbench) {
+                        window.setTimeout(returnToWorkbench);
+                    }
+                });
             },
+        });
+
+        this.plugin.setting.addItem({
+            title: this.plugin.i18n.documentTreeFocusSettings,
+            description: this.plugin.i18n.documentTreeAutoFocusDescription,
+            direction: "column",
+            actionElement: this.autoLocateInTreeInput,
         });
 
         this.plugin.setting.addItem({
@@ -248,10 +353,12 @@ export class DailyNotesSettings {
             this.selectedNotebookId = typeof stored?.notebookId === "string" ? stored.notebookId : "";
             this.templateDocument = storedTemplateDocument(stored);
             this.autoCreateOnStartup = stored?.autoCreateOnStartup === true;
+            this.autoLocateInTreeOnOpen = stored?.autoLocateInTreeOnOpen === true || stored?.autoFocusOnOpen === true;
         } catch {
             this.selectedNotebookId = "";
             this.templateDocument = null;
             this.autoCreateOnStartup = false;
+            this.autoLocateInTreeOnOpen = false;
         }
 
         this.resetDraftFromPersisted();
@@ -359,10 +466,20 @@ export class DailyNotesSettings {
     private async saveSettings() {
         let nativeSettingsUpdated = false;
         let templateSnapshotUpdated = false;
+        let documentTreeOnly = false;
         try {
             const notebookId = this.notebookSelect.value;
             if (!BLOCK_ID_PATTERN.test(notebookId)) {
-                throw new Error(this.plugin.i18n.dailyNotesSelectNotebook);
+                documentTreeOnly = true;
+                const enabled = this.autoLocateInTreeInput.checked;
+                await this.setAutoLocateInTreeOnOpen(enabled);
+                showMessage(
+                    enabled ?
+                        this.plugin.i18n.documentTreeAutoFocusEnabled :
+                        this.plugin.i18n.documentTreeAutoFocusDisabled,
+                    3000,
+                );
+                return true;
             }
             if (this.loadedSettingsNotebookId !== notebookId) {
                 throw new Error(this.plugin.i18n.dailyNotesSettingsStillLoading);
@@ -417,6 +534,7 @@ export class DailyNotesSettings {
                 templateDocumentId: savedTemplateDocument?.id,
                 templateDocumentTitle: savedTemplateDocument?.title,
                 autoCreateOnStartup: this.autoCreateInput.checked,
+                autoLocateInTreeOnOpen: this.autoLocateInTreeInput.checked,
             };
             const storageResponse = await this.plugin.saveData(STORAGE_NAME, nextPluginData);
             if (storageResponse.code !== 0) {
@@ -426,17 +544,22 @@ export class DailyNotesSettings {
             this.selectedNotebookId = notebookId;
             this.templateDocument = savedTemplateDocument;
             this.autoCreateOnStartup = this.autoCreateInput.checked;
+            this.autoLocateInTreeOnOpen = this.autoLocateInTreeInput.checked;
             this.rootInput.value = root;
             this.templateInput.value = savedTemplateDocument ? "" : templatePathForDisplay(dailyNoteTemplatePath);
             this.hideRootMessage();
             this.resetDraftFromPersisted();
             showMessage(this.plugin.i18n.dailyNotesSettingsSaved, 3000);
+            return true;
         } catch (error) {
             this.resetDraftFromPersisted();
-            const prefix = nativeSettingsUpdated || templateSnapshotUpdated ?
+            const prefix = documentTreeOnly ?
+                this.plugin.i18n.documentTreeAutoFocusSaveFailed :
+                nativeSettingsUpdated || templateSnapshotUpdated ?
                 this.plugin.i18n.dailyNotesSettingsPartialFailure :
                 this.plugin.i18n.dailyNotesSettingsSaveFailed;
             showMessage(`${prefix}: ${errorMessage(error)}`, 6000, "error");
+            return false;
         }
     }
 
@@ -525,6 +648,7 @@ export class DailyNotesSettings {
     private resetDraftFromPersisted() {
         this.draftTemplateDocument = this.templateDocument ? {...this.templateDocument} : null;
         this.autoCreateInput.checked = this.autoCreateOnStartup;
+        this.autoLocateInTreeInput.checked = this.autoLocateInTreeOnOpen;
         this.updateTemplateControls();
     }
 

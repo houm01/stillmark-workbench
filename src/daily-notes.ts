@@ -118,6 +118,7 @@ export class DailyNotesFeature {
                 void this.openToday();
             },
         });
+        this.topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--daily-note");
 
         if (isMobile) {
             this.topBarElement.addEventListener("contextmenu", this.touchContextMenuHandler);
@@ -146,6 +147,26 @@ export class DailyNotesFeature {
         this.topBarElement.removeEventListener("pointermove", this.pointerMoveHandler);
         this.topBarElement.removeEventListener("pointerup", this.pointerEndHandler);
         this.topBarElement.removeEventListener("pointercancel", this.pointerEndHandler);
+    }
+
+    shouldAutoLocateInTreeOnOpen() {
+        return this.settings.shouldAutoLocateInTreeOnOpen();
+    }
+
+    setAutoLocateInTreeOnOpen(enabled: boolean) {
+        return this.settings.setAutoLocateInTreeOnOpen(enabled);
+    }
+
+    async getConfigurationStatus() {
+        return (await this.settings.resolveNotebook()).status;
+    }
+
+    openDailyNotesSettings(returnToWorkbench?: () => void) {
+        this.settings.openDailyNotesSettings(returnToWorkbench);
+    }
+
+    openDocumentTreeFocusSettings(returnToWorkbench?: () => void) {
+        this.settings.openDocumentTreeFocusSettings(returnToWorkbench);
     }
 
     private openToday() {
