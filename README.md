@@ -16,13 +16,23 @@
 
 ## Available tools
 
-The upper-right Stillmark Workbench shows every tool and its current status, with direct entry points for daily notes, document-tree location, fonts, and PDF export. Automatic document-tree location can also be toggled there. Settings opened from the workbench provide a direct return action and reopen the workbench after a successful save.
+The upper-right Stillmark Workbench shows every tool and its current status, with direct entry points for daily notes, document-tree location, fonts, and PDF export. Automatic document-tree location, note-path breadcrumbs, and Linked pages can also be toggled there. Settings opened from the workbench provide a direct return action and reopen the workbench after a successful save.
 
 ### Find in document
 
 Press `Command + F` in the document editor (`Ctrl + F` on Windows/Linux) to open a compact find bar in the editor's upper-right corner. The plugin searches only the current document, highlights matches in document order, and supports `Enter` for next, `Shift + Enter` for previous, and `Esc` to close.
 
 SiYuan's native `Command + P` global search is unchanged. The plugin does not intercept `Command + F` in the workbench, settings, PDFs, or other non-document areas.
+
+### Note path
+
+A compact breadcrumb above the note title shows the current notebook and parent-document path. Click a parent to open it in the current tab, or `Command`-click (`Ctrl`-click on Windows/Linux) to open it in a new tab. Long paths stay on one line and scroll to the current note instead of crowding the title or document body. The breadcrumb is enabled by default and can be toggled in the workbench.
+
+### Linked pages
+
+Documents with explicit incoming block references show a compact Linked pages section below the document body. Sources follow SiYuan's native backlink sort and default expansion count. Each source can be collapsed independently, its title opens the source document, and clicking a rendered context block locates that exact block.
+
+The section is hidden when a document has no incoming references. Its contexts are read-only, loaded on demand through SiYuan's backlink APIs, and remain outside the editable document and exported content. Linked pages is enabled by default and can be toggled in the workbench.
 
 ### Daily notes
 
@@ -52,7 +62,7 @@ An upper-left font and size button provides 1px size controls, direct size input
 
 The upper-left PDF button loads the current document into a dedicated preview. Exports follow the current editor font by default, with any installed system font available for the current export, and include H1-H3 bookmarks in the PDF reader's sidebar outline by default without inserting a contents page into the body. Choose Reader, Minimal, or Report typesetting; A4, A5, or Letter paper; balanced or compact margins; and whether to include subdocuments or retain folded content.
 
-The export uses SiYuan's export-preview API and preserves images, tables, code, math, and common rendered blocks. PDF styles refine heading hierarchy, long tables, code blocks, and page breaks. After clicking Export PDF, choose a local folder and filename; the file is written directly without opening a printer or the system print panel.
+The export uses SiYuan's export-preview API and preserves images, tables, code, math, and common rendered blocks. PDF styles refine heading hierarchy, long tables, code blocks, and page breaks. In SiYuan Desktop on macOS, Copy PDF creates a temporary PDF and copies its file reference so it can be pasted as an attachment. Export PDF lets you choose a local folder and filename without opening a printer or the system print panel.
 
 ### Semantic block roles
 
@@ -88,6 +98,8 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 * Note and block data is accessed only through SiYuan kernel APIs.
 * The plugin does not directly read or write the workspace `data` directory.
 * Find in document reads only the current document through SiYuan's search API and never changes block content.
+* Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
+* Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.
 * Daily notes are written only to the explicitly configured, currently open notebook.
 * The seven-day history menu is read-only and never creates missing historical notes.
 * Batch actions affect only blocks explicitly selected by the user.

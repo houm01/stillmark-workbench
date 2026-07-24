@@ -5,7 +5,9 @@ import {
     showMessage,
 } from "siyuan";
 import {DailyNotesFeature} from "./daily-notes";
+import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {FontSwitcherFeature} from "./font-switcher";
+import {InlineBacklinksFeature} from "./inline-backlinks";
 import {PdfExportFeature} from "./pdf-export";
 
 type StatusState = "primary" | "neutral" | "warning";
@@ -20,6 +22,17 @@ interface ToolOptions {
     details?: HTMLElement;
 }
 
+interface ToggleOptions {
+    ariaLabel: string;
+    disabledMessage: string;
+    enabled: boolean;
+    enabledMessage: string;
+    label: string;
+    saveFailedMessage: string;
+    setEnabled: (enabled: boolean) => Promise<void>;
+    status: HTMLElement;
+}
+
 const ROLE_DEFINITIONS = [
     {value: "note", labelKey: "roleNote"},
     {value: "tip", labelKey: "roleTip"},
@@ -32,14 +45,23 @@ export class WorkbenchDialogFeature {
     constructor(
         private readonly plugin: Plugin,
         private readonly dailyNotes: DailyNotesFeature,
+        private readonly documentBreadcrumb: DocumentBreadcrumbFeature,
+        private readonly inlineBacklinks: InlineBacklinksFeature,
         private readonly fontSwitcher: FontSwitcherFeature,
         private readonly pdfExport: PdfExportFeature,
     ) {}
 
     async open() {
-        const [dailyNotesStatus, autoLocateInTree] = await Promise.all([
+        const [
+            dailyNotesStatus,
+            autoLocateInTree,
+            documentBreadcrumbEnabled,
+            inlineBacklinksEnabled,
+        ] = await Promise.all([
             this.dailyNotes.getConfigurationStatus().catch(() => "unavailable" as const),
             this.dailyNotes.shouldAutoLocateInTreeOnOpen().catch(() => false),
+            this.documentBreadcrumb.isEnabled(),
+            this.inlineBacklinks.isEnabled(),
         ]);
         const isMobile = ["mobile", "browser-mobile"].includes(getFrontend());
         const dialog = new Dialog({
@@ -71,7 +93,16 @@ export class WorkbenchDialogFeature {
             autoLocateInTree ? this.plugin.i18n.settingEnabled : this.plugin.i18n.settingDisabled,
             autoLocateInTree ? "primary" : "neutral",
         );
-        const autoLocateControl = this.createAutoLocateControl(autoLocateInTree, autoLocateStatus);
+        const autoLocateControl = this.createToggleControl({
+            ariaLabel: this.plugin.i18n.documentTreeAutoFocus,
+            disabledMessage: this.plugin.i18n.documentTreeAutoFocusDisabled,
+            enabled: autoLocateInTree,
+            enabledMessage: this.plugin.i18n.documentTreeAutoFocusEnabled,
+            label: this.plugin.i18n.autoLocate,
+            saveFailedMessage: this.plugin.i18n.documentTreeAutoFocusSaveFailed,
+            setEnabled: (enabled) => this.dailyNotes.setAutoLocateInTreeOnOpen(enabled),
+            status: autoLocateStatus,
+        });
         const documentTreeButton = this.createButton(this.plugin.i18n.configure, () => {
             dialog.destroy();
             this.dailyNotes.openDocumentTreeFocusSettings(() => {
@@ -92,6 +123,52 @@ export class WorkbenchDialogFeature {
             description: this.plugin.i18n.documentFindToolDescription,
             status: this.plugin.i18n.available,
             statusState: "primary",
+        }));
+
+        const documentBreadcrumbStatus = this.createStatus(
+            documentBreadcrumbEnabled ? this.plugin.i18n.settingEnabled : this.plugin.i18n.settingDisabled,
+            documentBreadcrumbEnabled ? "primary" : "neutral",
+        );
+        const documentBreadcrumbControl = this.createToggleControl({
+            ariaLabel: this.plugin.i18n.documentBreadcrumbTool,
+            disabledMessage: this.plugin.i18n.documentBreadcrumbDisabled,
+            enabled: documentBreadcrumbEnabled,
+            enabledMessage: this.plugin.i18n.documentBreadcrumbEnabled,
+            label: this.plugin.i18n.showFeature,
+            saveFailedMessage: this.plugin.i18n.documentBreadcrumbSaveFailed,
+            setEnabled: (enabled) => this.documentBreadcrumb.setEnabled(enabled),
+            status: documentBreadcrumbStatus,
+        });
+        root.append(this.createTool({
+            title: this.plugin.i18n.documentBreadcrumbTool,
+            description: this.plugin.i18n.documentBreadcrumbToolDescription,
+            status: documentBreadcrumbStatus.textContent,
+            statusState: documentBreadcrumbStatus.dataset.state as StatusState,
+            statusElement: documentBreadcrumbStatus,
+            controls: [documentBreadcrumbControl],
+        }));
+
+        const inlineBacklinksStatus = this.createStatus(
+            inlineBacklinksEnabled ? this.plugin.i18n.settingEnabled : this.plugin.i18n.settingDisabled,
+            inlineBacklinksEnabled ? "primary" : "neutral",
+        );
+        const inlineBacklinksControl = this.createToggleControl({
+            ariaLabel: this.plugin.i18n.inlineBacklinksTool,
+            disabledMessage: this.plugin.i18n.inlineBacklinksDisabled,
+            enabled: inlineBacklinksEnabled,
+            enabledMessage: this.plugin.i18n.inlineBacklinksEnabled,
+            label: this.plugin.i18n.showFeature,
+            saveFailedMessage: this.plugin.i18n.inlineBacklinksSaveFailed,
+            setEnabled: (enabled) => this.inlineBacklinks.setEnabled(enabled),
+            status: inlineBacklinksStatus,
+        });
+        root.append(this.createTool({
+            title: this.plugin.i18n.inlineBacklinksTool,
+            description: this.plugin.i18n.inlineBacklinksToolDescription,
+            status: inlineBacklinksStatus.textContent,
+            statusState: inlineBacklinksStatus.dataset.state as StatusState,
+            statusElement: inlineBacklinksStatus,
+            controls: [inlineBacklinksControl],
         }));
 
         const chooseFontButton = this.createButton(this.plugin.i18n.fontSwitcherChoose, () => {
@@ -179,36 +256,34 @@ export class WorkbenchDialogFeature {
         return button;
     }
 
-    private createAutoLocateControl(enabled: boolean, status: HTMLElement) {
+    private createToggleControl(options: ToggleOptions) {
         const label = document.createElement("label");
         label.className = "stillmark-workbench__switch";
 
         const text = document.createElement("span");
-        text.textContent = this.plugin.i18n.autoLocate;
+        text.textContent = options.label;
         const input = document.createElement("input");
         input.type = "checkbox";
         input.className = "b3-switch";
-        input.checked = enabled;
-        input.setAttribute("aria-label", this.plugin.i18n.documentTreeAutoFocus);
+        input.checked = options.enabled;
+        input.setAttribute("aria-label", options.ariaLabel);
         input.addEventListener("change", () => {
             const requestedState = input.checked;
             input.disabled = true;
-            void this.dailyNotes.setAutoLocateInTreeOnOpen(requestedState).then(() => {
+            void options.setEnabled(requestedState).then(() => {
                 this.syncStatus(
-                    status,
+                    options.status,
                     requestedState ? this.plugin.i18n.settingEnabled : this.plugin.i18n.settingDisabled,
                     requestedState ? "primary" : "neutral",
                 );
                 showMessage(
-                    requestedState ?
-                        this.plugin.i18n.documentTreeAutoFocusEnabled :
-                        this.plugin.i18n.documentTreeAutoFocusDisabled,
+                    requestedState ? options.enabledMessage : options.disabledMessage,
                     3000,
                 );
             }).catch((error) => {
                 input.checked = !requestedState;
                 showMessage(
-                    `${this.plugin.i18n.documentTreeAutoFocusSaveFailed}: ${errorMessage(error)}`,
+                    `${options.saveFailedMessage}: ${errorMessage(error)}`,
                     5000,
                     "error",
                 );
