@@ -5,11 +5,14 @@ import {
     showMessage,
 } from "siyuan";
 import {DailyNotesFeature} from "./daily-notes";
+import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {DocumentFindFeature} from "./document-find";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
+import {InlineBacklinksFeature} from "./inline-backlinks";
 import {PdfExportFeature} from "./pdf-export";
 import {WorkbenchDialogFeature} from "./workbench-dialog";
+import {WorkbenchPreferences} from "./workbench-preferences";
 import "./index.scss";
 
 const ROLE_ATTRIBUTE = "custom-stillmark-role";
@@ -37,11 +40,14 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 
 export default class StillmarkWorkbench extends Plugin {
     private dailyNotes?: DailyNotesFeature;
+    private documentBreadcrumb?: DocumentBreadcrumbFeature;
     private documentFind?: DocumentFindFeature;
     private documentTreeFocus?: DocumentTreeFocusFeature;
     private fontSwitcher?: FontSwitcherFeature;
+    private inlineBacklinks?: InlineBacklinksFeature;
     private pdfExport?: PdfExportFeature;
     private workbench?: WorkbenchDialogFeature;
+    private workbenchPreferences?: WorkbenchPreferences;
 
     private readonly blockMenuHandler = ({detail}: CustomEvent<BlockMenuDetail>) => {
         detail.menu.addItem({
@@ -87,6 +93,11 @@ export default class StillmarkWorkbench extends Plugin {
         this.dailyNotes = new DailyNotesFeature(this);
         this.dailyNotes.onload();
 
+        this.workbenchPreferences = new WorkbenchPreferences(this);
+
+        this.documentBreadcrumb = new DocumentBreadcrumbFeature(this, this.workbenchPreferences);
+        this.documentBreadcrumb.onload();
+
         this.documentFind = new DocumentFindFeature(this);
         this.documentFind.onload();
 
@@ -96,10 +107,20 @@ export default class StillmarkWorkbench extends Plugin {
         this.fontSwitcher = new FontSwitcherFeature(this);
         this.fontSwitcher.onload();
 
+        this.inlineBacklinks = new InlineBacklinksFeature(this, this.workbenchPreferences);
+        this.inlineBacklinks.onload();
+
         this.pdfExport = new PdfExportFeature(this);
         this.pdfExport.onload();
 
-        this.workbench = new WorkbenchDialogFeature(this, this.dailyNotes, this.fontSwitcher, this.pdfExport);
+        this.workbench = new WorkbenchDialogFeature(
+            this,
+            this.dailyNotes,
+            this.documentBreadcrumb,
+            this.inlineBacklinks,
+            this.fontSwitcher,
+            this.pdfExport,
+        );
     }
 
     onLayoutReady() {
@@ -114,15 +135,19 @@ export default class StillmarkWorkbench extends Plugin {
         topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--workbench");
 
         this.dailyNotes?.onLayoutReady();
+        this.documentBreadcrumb?.onLayoutReady();
         this.documentTreeFocus?.onLayoutReady();
         this.fontSwitcher?.onLayoutReady();
+        this.inlineBacklinks?.onLayoutReady();
         this.pdfExport?.onLayoutReady();
     }
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockMenuHandler);
+        this.documentBreadcrumb?.onunload();
         this.documentFind?.onunload();
         this.documentTreeFocus?.onunload();
+        this.inlineBacklinks?.onunload();
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
     }

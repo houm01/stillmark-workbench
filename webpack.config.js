@@ -65,6 +65,7 @@ module.exports = (env, argv) => {
         },
         externals: {
             electron: "commonjs electron",
+            "node:child_process": "commonjs node:child_process",
             "node:fs/promises": "commonjs node:fs/promises",
             "node:os": "commonjs node:os",
             "node:path": "commonjs node:path",

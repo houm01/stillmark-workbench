@@ -4,6 +4,13 @@ This file records user-visible changes to Stillmark Workbench.
 
 ## Unreleased
 
+### Added
+
+* Add a compact note-path breadcrumb above each document title with direct parent-document navigation and deep-path overflow handling.
+* Add a macOS Copy PDF action that generates a temporary PDF and places its file reference on the clipboard for direct attachment pasting without opening a save dialog.
+* Add a read-only Linked pages section below document content with grouped backlink context, native sorting and expansion defaults, lazy loading, and exact source-block navigation.
+* Add persistent workbench switches for breadcrumb navigation and Linked pages display, with immediate updates in open documents.
+
 ## 0.2.0 — 2026-07-16
 
 ### Added

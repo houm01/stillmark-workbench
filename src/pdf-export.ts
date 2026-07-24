@@ -53,6 +53,7 @@ interface ExportPreviewData {
 
 interface PdfExportSession {
     active: boolean;
+    copyButton: HTMLButtonElement;
     currentFontCss: string;
     dialog: Dialog;
     documentId: string;
@@ -69,9 +70,19 @@ interface SaveDialogResult {
     filePath?: string;
 }
 
+interface CopiedPdfFile {
+    tempDirectory: string;
+}
+
 interface DesktopExportServices {
+    copyPdfFile?: (
+        filename: string,
+        data: Uint8Array,
+        verificationFailedMessage: string,
+    ) => Promise<CopiedPdfFile>;
     defaultPath: (filename: string) => string;
     invoke: (channel: string, data: Record<string, unknown>) => Promise<unknown>;
+    removeTempDirectory?: (path: string) => Promise<void>;
     writeFile: (path: string, data: Uint8Array) => Promise<void>;
 }
 
@@ -92,6 +103,7 @@ const PAGE_MARGINS: Record<PdfMargin, string> = {
 
 export class PdfExportFeature {
     private activeDialog?: Dialog;
+    private copiedPdfTempDirectory?: string;
     private settings: PdfExportSettings = {...DEFAULT_SETTINGS};
     private settingsReady: Promise<void> = Promise.resolve();
 
@@ -264,15 +276,21 @@ export class PdfExportFeature {
         closeButton.className = "b3-button b3-button--cancel";
         closeButton.textContent = this.plugin.i18n.pdfExportClose;
         closeButton.addEventListener("click", () => dialog.destroy());
+        const copyButton = document.createElement("button");
+        copyButton.type = "button";
+        copyButton.className = "b3-button b3-button--cancel";
+        copyButton.textContent = this.plugin.i18n.pdfExportCopyAction;
+        copyButton.disabled = true;
         const exportButton = document.createElement("button");
         exportButton.type = "button";
         exportButton.className = "b3-button b3-button--text";
         exportButton.textContent = this.plugin.i18n.pdfExportAction;
         exportButton.disabled = true;
-        actions.append(name, status, closeButton, exportButton);
+        actions.append(name, status, closeButton, copyButton, exportButton);
 
         const session: PdfExportSession = {
             active: true,
+            copyButton,
             currentFontCss: currentFont.css,
             dialog,
             documentId,
@@ -323,7 +341,10 @@ export class PdfExportFeature {
             void this.refreshPreview(session);
         });
         exportButton.addEventListener("click", () => {
-            void this.print(session);
+            void this.save(session);
+        });
+        copyButton.addEventListener("click", () => {
+            void this.copy(session);
         });
 
         return session;
@@ -331,7 +352,7 @@ export class PdfExportFeature {
 
     private async refreshPreview(session: PdfExportSession) {
         const sequence = ++session.requestSequence;
-        session.exportButton.disabled = true;
+        this.setActionsDisabled(session, true);
         session.statusElement.textContent = this.plugin.i18n.pdfExportLoading;
         session.previewElement.replaceChildren(this.createLoading());
 
@@ -354,7 +375,7 @@ export class PdfExportFeature {
             session.nameElement.textContent = data.name;
             this.renderRichContent(documentElement);
             session.statusElement.textContent = this.plugin.i18n.pdfExportReady;
-            session.exportButton.disabled = false;
+            this.setActionsDisabled(session, false);
         } catch (error) {
             if (!session.active || sequence !== session.requestSequence) {
                 return;
@@ -455,11 +476,11 @@ export class PdfExportFeature {
         });
     }
 
-    private async print(session: PdfExportSession) {
-        if (!session.active || session.exportButton.disabled) {
+    private async save(session: PdfExportSession) {
+        if (!this.canStartAction(session)) {
             return;
         }
-        session.exportButton.disabled = true;
+        this.setActionsDisabled(session, true);
         session.statusElement.textContent = this.plugin.i18n.pdfExportChoosingLocation;
 
         try {
@@ -484,12 +505,81 @@ export class PdfExportFeature {
                 throw new Error(this.plugin.i18n.pdfExportUnavailable);
             }
             const filePath = ensurePdfExtension(saveResult.filePath);
-            session.statusElement.textContent = this.plugin.i18n.pdfExportPreparing;
-            await waitForContent(session.previewElement);
-            if (!session.active) {
+            const pdfData = await this.generatePdf(session, desktop);
+            if (!pdfData) {
                 return;
             }
-            this.cleanupPrintRoot();
+            await desktop.writeFile(filePath, pdfData);
+            session.statusElement.textContent = this.plugin.i18n.pdfExportSaved;
+            showMessage(this.plugin.i18n.pdfExportSavedPath.replace("${path}", filePath), 5000);
+        } catch (error) {
+            const message = errorMessage(error);
+            if (session.active) {
+                showMessage(`${this.plugin.i18n.pdfExportFailed}: ${message}`, 5000, "error");
+                session.statusElement.textContent = this.plugin.i18n.pdfExportReady;
+            }
+        } finally {
+            if (session.active) {
+                this.setActionsDisabled(session, false);
+            }
+        }
+    }
+
+    private async copy(session: PdfExportSession) {
+        if (!this.canStartAction(session)) {
+            return;
+        }
+        this.setActionsDisabled(session, true);
+
+        try {
+            const desktop = getDesktopExportServices();
+            if (!desktop?.copyPdfFile) {
+                throw new Error(this.plugin.i18n.pdfExportCopyUnavailable);
+            }
+            const pdfData = await this.generatePdf(session, desktop);
+            if (!pdfData) {
+                return;
+            }
+            const filename = `${sanitizePdfFilename(session.nameElement.textContent)}.pdf`;
+            const copiedFile = await desktop.copyPdfFile(
+                filename,
+                pdfData,
+                this.plugin.i18n.pdfExportCopyVerificationFailed,
+            );
+            const previousTempDirectory = this.copiedPdfTempDirectory;
+            this.copiedPdfTempDirectory = copiedFile.tempDirectory;
+            if (previousTempDirectory && desktop.removeTempDirectory) {
+                void desktop.removeTempDirectory(previousTempDirectory).catch((error) => {
+                    console.warn("Failed to remove the previous Stillmark copied PDF", error);
+                });
+            }
+            session.statusElement.textContent = this.plugin.i18n.pdfExportCopied;
+            showMessage(this.plugin.i18n.pdfExportCopied, 4000);
+        } catch (error) {
+            const message = errorMessage(error);
+            if (session.active) {
+                showMessage(`${this.plugin.i18n.pdfExportCopyFailed}: ${message}`, 5000, "error");
+                session.statusElement.textContent = this.plugin.i18n.pdfExportReady;
+            }
+        } finally {
+            if (session.active) {
+                this.setActionsDisabled(session, false);
+            }
+        }
+    }
+
+    private async generatePdf(
+        session: PdfExportSession,
+        desktop: DesktopExportServices,
+    ): Promise<Uint8Array | undefined> {
+        session.statusElement.textContent = this.plugin.i18n.pdfExportPreparing;
+        await waitForContent(session.previewElement);
+        if (!session.active) {
+            return undefined;
+        }
+
+        this.cleanupPrintRoot();
+        try {
             const printRoot = document.createElement("div");
             printRoot.className = PRINT_ROOT_CLASS;
             printRoot.dataset.preset = session.settings.preset;
@@ -514,6 +604,9 @@ export class PdfExportFeature {
             document.body.classList.add(PRINTING_BODY_CLASS);
             document.body.append(printRoot);
             await waitForContent(printRoot);
+            if (!session.active) {
+                return undefined;
+            }
 
             const webContentsId = await desktop.invoke(Constants.SIYUAN_GET, {cmd: "getContentsId"});
             if (typeof webContentsId !== "number" || !Number.isInteger(webContentsId)) {
@@ -535,30 +628,30 @@ export class PdfExportFeature {
             if (!(rawPdfData instanceof Uint8Array) || rawPdfData.byteLength === 0) {
                 throw new Error(this.plugin.i18n.pdfExportUnavailable);
             }
-            let pdfData = rawPdfData;
-            if (session.settings.includeToc) {
-                session.statusElement.textContent = this.plugin.i18n.pdfExportProcessingOutline;
-                try {
-                    pdfData = await addPdfOutline(rawPdfData, outlineHeadings);
-                } catch (error) {
-                    throw new Error(`${this.plugin.i18n.pdfExportOutlineFailed}: ${errorMessage(error)}`, {
-                        cause: error,
-                    });
-                }
+            if (!session.settings.includeToc) {
+                return rawPdfData;
             }
-            await desktop.writeFile(filePath, pdfData);
-            session.statusElement.textContent = this.plugin.i18n.pdfExportSaved;
-            showMessage(this.plugin.i18n.pdfExportSavedPath.replace("${path}", filePath), 5000);
-        } catch (error) {
-            const message = errorMessage(error);
-            showMessage(`${this.plugin.i18n.pdfExportFailed}: ${message}`, 5000, "error");
-            session.statusElement.textContent = this.plugin.i18n.pdfExportReady;
+
+            session.statusElement.textContent = this.plugin.i18n.pdfExportProcessingOutline;
+            try {
+                return await addPdfOutline(rawPdfData, outlineHeadings);
+            } catch (error) {
+                throw new Error(`${this.plugin.i18n.pdfExportOutlineFailed}: ${errorMessage(error)}`, {
+                    cause: error,
+                });
+            }
         } finally {
             this.cleanupPrintRoot();
-            if (session.active) {
-                session.exportButton.disabled = false;
-            }
         }
+    }
+
+    private canStartAction(session: PdfExportSession) {
+        return session.active && !session.copyButton.disabled && !session.exportButton.disabled;
+    }
+
+    private setActionsDisabled(session: PdfExportSession, disabled: boolean) {
+        session.copyButton.disabled = disabled;
+        session.exportButton.disabled = disabled;
     }
 
     private createSelect(labelText: string, options: string[][], value: string) {
@@ -761,23 +854,107 @@ function getDesktopExportServices(): DesktopExportServices | undefined {
         const {ipcRenderer} = require("electron") as {
             ipcRenderer?: {invoke: DesktopExportServices["invoke"];};
         };
-        const {writeFile} = require("node:fs/promises") as {
+        const {mkdtemp, realpath, rm, writeFile} = require("node:fs/promises") as {
+            mkdtemp?: (prefix: string) => Promise<string>;
+            realpath?: (path: string) => Promise<string>;
+            rm?: (path: string, options: {force: boolean; recursive: boolean;}) => Promise<void>;
             writeFile?: DesktopExportServices["writeFile"];
         };
-        const {homedir} = require("node:os") as {homedir?: () => string;};
+        const {homedir, tmpdir} = require("node:os") as {
+            homedir?: () => string;
+            tmpdir?: () => string;
+        };
         const {join} = require("node:path") as {join?: (...paths: string[]) => string;};
         if (!ipcRenderer?.invoke || !writeFile || !homedir || !join) {
             return undefined;
         }
+        const copyPdfFile = process.platform === "darwin" && mkdtemp && realpath && rm && tmpdir ?
+            createMacPdfFileCopier({join, mkdtemp, realpath, rm, tmpdir, writeFile}) :
+            undefined;
         return {
+            copyPdfFile,
             defaultPath: (filename) => join(homedir(), "Downloads", filename),
             invoke: ipcRenderer.invoke.bind(ipcRenderer),
+            removeTempDirectory: rm ?
+                (path) => rm(path, {force: true, recursive: true}) :
+                undefined,
             writeFile,
         };
     } catch (error) {
         console.warn("Stillmark direct PDF export is unavailable", error);
         return undefined;
     }
+}
+
+interface MacPdfFileCopierDependencies {
+    join: (...paths: string[]) => string;
+    mkdtemp: (prefix: string) => Promise<string>;
+    realpath: (path: string) => Promise<string>;
+    rm: (path: string, options: {force: boolean; recursive: boolean;}) => Promise<void>;
+    tmpdir: () => string;
+    writeFile: DesktopExportServices["writeFile"];
+}
+
+type ExecFile = (
+    file: string,
+    args: string[],
+    options: {encoding: "utf8"; timeout: number;},
+    callback: (error: Error | null, stdout: string) => void,
+) => unknown;
+
+function createMacPdfFileCopier(dependencies: MacPdfFileCopierDependencies) {
+    return async (
+        filename: string,
+        data: Uint8Array,
+        verificationFailedMessage: string,
+    ): Promise<CopiedPdfFile> => {
+        const tempDirectory = await dependencies.mkdtemp(
+            dependencies.join(dependencies.tmpdir(), "stillmark-workbench-pdf-"),
+        );
+        const filePath = dependencies.join(tempDirectory, filename);
+        try {
+            await dependencies.writeFile(filePath, data);
+            const canonicalFilePath = await dependencies.realpath(filePath);
+            const copiedPath = await copyMacFileToClipboard(canonicalFilePath);
+            const canonicalCopiedPath = await dependencies.realpath(copiedPath);
+            if (canonicalCopiedPath !== canonicalFilePath) {
+                throw new Error(verificationFailedMessage);
+            }
+            return {
+                tempDirectory,
+            };
+        } catch (error) {
+            await dependencies.rm(tempDirectory, {force: true, recursive: true});
+            throw error;
+        }
+    };
+}
+
+async function copyMacFileToClipboard(filePath: string) {
+    const {execFile} = require("node:child_process") as {execFile?: ExecFile;};
+    if (!execFile) {
+        throw new Error("macOS file clipboard is unavailable");
+    }
+    const script = `on run argv
+set sourceFile to POSIX file (item 1 of argv)
+set the clipboard to sourceFile
+set copiedFile to the clipboard as alias
+return POSIX path of copiedFile
+end run`;
+    const copiedPath = await executeFile(execFile, "/usr/bin/osascript", ["-e", script, filePath]);
+    return copiedPath.trim();
+}
+
+function executeFile(execFile: ExecFile, file: string, args: string[]) {
+    return new Promise<string>((resolve, reject) => {
+        execFile(file, args, {encoding: "utf8", timeout: 10000}, (error, stdout) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve(stdout);
+        });
+    });
 }
 
 function getCurrentEditorFont(element: HTMLElement, defaultLabel: string): CurrentEditorFont {
