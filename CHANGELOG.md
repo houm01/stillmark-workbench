@@ -2,7 +2,7 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
-## Unreleased
+## 0.2.1 — 2026-07-25
 
 ### Added
 
@@ -35,6 +35,7 @@ This file records user-visible changes to Stillmark Workbench.
 
 ### Fixed
 
+* Correct the marketplace platform metadata so `all` is not mixed with explicit platform values.
 * Anchor the font and size menu to its workbench button instead of the upper-left toolbar shortcut.
 * Generate PDF bytes directly and save them through the native file dialog instead of invoking the system printer or PDF.js print overlay.
 * Restore multi-page PDF pagination under SiYuan's fixed-height desktop shell, move the table of contents into the PDF outline, and tighten the title-to-body spacing.
