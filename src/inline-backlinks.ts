@@ -9,10 +9,12 @@ import {
     getFrontend,
     openMobileFileById,
     openTab,
+    showMessage,
 } from "siyuan";
 import {WorkbenchPreferences} from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
+const MAX_DISPLAY_NAME_LENGTH = 256;
 const REFRESH_DELAY_MS = 450;
 const OPEN_BLOCK_ACTIONS: TProtyleAction[] = [
     "cb-get-focus",
@@ -66,8 +68,13 @@ interface SourceState {
     container: HTMLElement;
     context: HTMLElement;
     contextGeneration: number;
+    displayName?: string;
+    editButton: HTMLButtonElement;
     embedded?: Protyle;
+    row: HTMLElement;
     source: BacklinkSource;
+    title: HTMLButtonElement;
+    titleText: HTMLSpanElement;
     toggle: HTMLButtonElement;
 }
 
@@ -255,7 +262,13 @@ export class InlineBacklinksFeature {
             const sources = Array.isArray(data?.backlinks) ?
                 data.backlinks.filter(validBacklinkSource) :
                 [];
-            this.renderSources(state, sources);
+            const displayNames = await Promise.all(
+                sources.map((source) => this.preferences.getInlineBacklinkDisplayName(source.id)),
+            );
+            if (!this.isCurrent(state, generation)) {
+                return;
+            }
+            this.renderSources(state, sources, displayNames);
         } catch {
             if (this.isCurrent(state, generation)) {
                 this.renderSummaryError(state);
@@ -263,7 +276,7 @@ export class InlineBacklinksFeature {
         }
     }
 
-    private renderSources(state: EditorState, sources: BacklinkSource[]) {
+    private renderSources(state: EditorState, sources: BacklinkSource[], displayNames: Array<string | undefined>) {
         const wasRendered = state.hasRendered;
         this.clearSources(state);
         state.hasRendered = sources.length > 0;
@@ -287,8 +300,8 @@ export class InlineBacklinksFeature {
             sources.slice(0, expandCount).forEach((source) => state.expandedSourceIds.add(source.id));
         }
 
-        sources.forEach((source) => {
-            const sourceState = this.createSource(state, source);
+        sources.forEach((source, index) => {
+            const sourceState = this.createSource(state, source, displayNames[index]);
             state.sourceStates.set(source.id, sourceState);
             state.body.append(sourceState.container);
         });
@@ -306,8 +319,8 @@ export class InlineBacklinksFeature {
         }
     }
 
-    private createSource(state: EditorState, source: BacklinkSource) {
-        const sourceName = backlinkSourceName(source, this.plugin.i18n.inlineBacklinksUntitled);
+    private createSource(state: EditorState, source: BacklinkSource, displayName?: string) {
+        const sourceName = backlinkSourceName(source, this.plugin.i18n.inlineBacklinksUntitled, displayName);
         const container = document.createElement("article");
         container.className = "stillmark-inline-backlinks__source";
         container.dataset.sourceId = source.id;
@@ -328,7 +341,15 @@ export class InlineBacklinksFeature {
             "aria-label",
             this.plugin.i18n.inlineBacklinksOpenSource.replace("${name}", sourceName),
         );
-        title.append(createIcon("iconFile"), createText(sourceName));
+        const titleText = createText(sourceName);
+        title.append(createIcon("iconFile"), titleText);
+
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.className = "stillmark-inline-backlinks__source-edit";
+        editButton.title = this.plugin.i18n.inlineBacklinksEditDisplayName.replace("${name}", sourceName);
+        editButton.setAttribute("aria-label", editButton.title);
+        editButton.append(createIcon("iconEdit"));
 
         const context = document.createElement("div");
         context.className = "stillmark-inline-backlinks__context";
@@ -338,7 +359,12 @@ export class InlineBacklinksFeature {
             container,
             context,
             contextGeneration: 0,
+            displayName,
+            editButton,
+            row,
             source,
+            title,
+            titleText,
             toggle,
         };
         toggle.addEventListener("click", () => {
@@ -346,6 +372,9 @@ export class InlineBacklinksFeature {
         });
         title.addEventListener("click", () => {
             void this.openBlock(source.id);
+        });
+        editButton.addEventListener("click", () => {
+            this.beginDisplayNameEdit(state, sourceState);
         });
         context.addEventListener("click", (event) => {
             const target = event.target instanceof Element ? event.target : null;
@@ -357,10 +386,146 @@ export class InlineBacklinksFeature {
             event.stopPropagation();
             void this.openBlock(block.dataset.nodeId);
         });
-        row.append(toggle, title);
+        row.append(toggle, title, editButton);
         container.append(row, context);
         this.syncSourceToggle(sourceState, false);
         return sourceState;
+    }
+
+    private beginDisplayNameEdit(state: EditorState, sourceState: SourceState) {
+        if (sourceState.row.querySelector(".stillmark-inline-backlinks__display-name-form")) {
+            return;
+        }
+
+        const documentName = backlinkSourceName(
+            sourceState.source,
+            this.plugin.i18n.inlineBacklinksUntitled,
+        );
+        const form = document.createElement("form");
+        form.className = "stillmark-inline-backlinks__display-name-form";
+        form.setAttribute(
+            "aria-label",
+            this.plugin.i18n.inlineBacklinksEditDisplayName.replace(
+                "${name}",
+                backlinkSourceName(
+                    sourceState.source,
+                    this.plugin.i18n.inlineBacklinksUntitled,
+                    sourceState.displayName,
+                ),
+            ),
+        );
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "b3-text-field stillmark-inline-backlinks__display-name-input";
+        input.maxLength = MAX_DISPLAY_NAME_LENGTH;
+        input.placeholder = this.plugin.i18n.inlineBacklinksDisplayNamePlaceholder.replace(
+            "${name}",
+            documentName,
+        );
+        input.title = this.plugin.i18n.inlineBacklinksDisplayNameHint;
+        input.value = sourceState.displayName ?? documentName;
+
+        const save = createIconButton(
+            "stillmark-inline-backlinks__display-name-save",
+            "iconSelect",
+            this.plugin.i18n.inlineBacklinksSaveDisplayName,
+        );
+        save.type = "submit";
+        const cancel = createIconButton(
+            "stillmark-inline-backlinks__display-name-cancel",
+            "iconClose",
+            this.plugin.i18n.inlineBacklinksCancelDisplayNameEdit,
+        );
+
+        const restoreRow = () => {
+            if (state.sourceStates.get(sourceState.source.id) === sourceState) {
+                sourceState.row.replaceChildren(
+                    sourceState.toggle,
+                    sourceState.title,
+                    sourceState.editButton,
+                );
+            }
+        };
+
+        let saving = false;
+        cancel.addEventListener("click", restoreRow);
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !event.isComposing) {
+                event.preventDefault();
+                restoreRow();
+                sourceState.editButton.focus();
+            }
+        });
+        form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            if (saving) {
+                return;
+            }
+            saving = true;
+            input.disabled = true;
+            save.disabled = true;
+            cancel.disabled = true;
+            void this.saveDisplayName(sourceState.source.id, input.value)
+                .then(() => {
+                    restoreRow();
+                    sourceState.editButton.focus();
+                })
+                .catch((error: unknown) => {
+                    saving = false;
+                    input.disabled = false;
+                    save.disabled = false;
+                    cancel.disabled = false;
+                    showMessage(
+                        `${this.plugin.i18n.inlineBacklinksDisplayNameSaveFailed}: ${errorMessage(error)}`,
+                        5000,
+                        "error",
+                    );
+                    input.focus();
+                    input.select();
+                });
+        });
+
+        form.append(input, save, cancel);
+        sourceState.row.replaceChildren(form);
+        input.focus();
+        input.select();
+    }
+
+    private async saveDisplayName(sourceId: string, value: string) {
+        const displayName = normalizeDisplayName(value);
+        await this.preferences.setInlineBacklinkDisplayName(sourceId, displayName);
+        this.states.forEach((state) => {
+            const sourceState = state.sourceStates.get(sourceId);
+            if (!sourceState) {
+                return;
+            }
+            sourceState.displayName = displayName;
+            this.syncSourceName(sourceState);
+        });
+    }
+
+    private syncSourceName(sourceState: SourceState) {
+        const sourceName = backlinkSourceName(
+            sourceState.source,
+            this.plugin.i18n.inlineBacklinksUntitled,
+            sourceState.displayName,
+        );
+        sourceState.titleText.textContent = sourceName;
+        sourceState.title.title = sourceState.source.hPath || sourceName;
+        sourceState.title.setAttribute(
+            "aria-label",
+            this.plugin.i18n.inlineBacklinksOpenSource.replace("${name}", sourceName),
+        );
+        sourceState.editButton.title = this.plugin.i18n.inlineBacklinksEditDisplayName.replace(
+            "${name}",
+            sourceName,
+        );
+        sourceState.editButton.setAttribute("aria-label", sourceState.editButton.title);
+        this.syncSourceToggle(
+            sourceState,
+            sourceState.toggle.getAttribute("aria-expanded") === "true",
+        );
     }
 
     private setSourceExpanded(state: EditorState, sourceState: SourceState, expanded: boolean) {
@@ -523,7 +688,11 @@ export class InlineBacklinksFeature {
     }
 
     private syncSourceToggle(sourceState: SourceState, expanded: boolean) {
-        const sourceName = backlinkSourceName(sourceState.source, this.plugin.i18n.inlineBacklinksUntitled);
+        const sourceName = backlinkSourceName(
+            sourceState.source,
+            this.plugin.i18n.inlineBacklinksUntitled,
+            sourceState.displayName,
+        );
         sourceState.toggle.classList.toggle("is-expanded", expanded);
         sourceState.toggle.setAttribute("aria-expanded", String(expanded));
         sourceState.toggle.setAttribute(
@@ -640,7 +809,10 @@ function validBacklinkSource(source: BacklinkSource) {
     return Boolean(source && BLOCK_ID_PATTERN.test(source.id));
 }
 
-function backlinkSourceName(source: BacklinkSource, fallback: string) {
+function backlinkSourceName(source: BacklinkSource, fallback: string, displayName?: string) {
+    if (displayName?.trim()) {
+        return displayName.trim();
+    }
     if (source.name?.trim()) {
         return source.name.trim();
     }
@@ -720,6 +892,27 @@ function createText(text: string) {
     const span = document.createElement("span");
     span.textContent = text;
     return span;
+}
+
+function createIconButton(className: string, icon: string, label: string) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.append(createIcon(icon));
+    return button;
+}
+
+function normalizeDisplayName(displayName: string) {
+    return displayName
+        .replace(/[\r\n\u2028\u2029]+/g, " ")
+        .trim()
+        .slice(0, MAX_DISPLAY_NAME_LENGTH) || undefined;
+}
+
+function errorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
 }
 
 function isMobile() {
