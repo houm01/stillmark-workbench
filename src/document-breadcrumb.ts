@@ -42,9 +42,12 @@ interface EditorState {
 
 export class DocumentBreadcrumbFeature {
     private readonly states = new Map<HTMLElement, EditorState>();
+    private enabled = false;
 
     private readonly editorChangedHandler = ({detail}: CustomEvent<{protyle: IProtyle;}>) => {
-        void this.syncEditorWhenEnabled(detail.protyle);
+        if (this.enabled) {
+            this.syncEditor(detail.protyle);
+        }
     };
 
     private readonly destroyProtyleHandler = ({detail}: CustomEvent<{protyle: IProtyle;}>) => {
@@ -81,7 +84,7 @@ export class DocumentBreadcrumbFeature {
     }
 
     onLayoutReady() {
-        void this.syncAllEditorsWhenEnabled();
+        void this.initialize();
     }
 
     onunload() {
@@ -99,6 +102,7 @@ export class DocumentBreadcrumbFeature {
 
     async setEnabled(enabled: boolean) {
         await this.preferences.setDocumentBreadcrumbEnabled(enabled);
+        this.enabled = enabled;
         if (enabled) {
             getAllEditor().forEach((editor) => this.syncEditor(editor.protyle));
             return;
@@ -106,15 +110,10 @@ export class DocumentBreadcrumbFeature {
         [...this.states.values()].forEach((state) => this.destroyState(state));
     }
 
-    private async syncAllEditorsWhenEnabled() {
-        if (await this.isEnabled()) {
+    private async initialize() {
+        this.enabled = await this.isEnabled();
+        if (this.enabled) {
             getAllEditor().forEach((editor) => this.syncEditor(editor.protyle));
-        }
-    }
-
-    private async syncEditorWhenEnabled(protyle: IProtyle) {
-        if (await this.isEnabled()) {
-            this.syncEditor(protyle);
         }
     }
 
@@ -143,8 +142,9 @@ export class DocumentBreadcrumbFeature {
         const breadcrumb = document.createElement("nav");
         breadcrumb.className = "stillmark-document-breadcrumb";
         breadcrumb.setAttribute("aria-label", this.plugin.i18n.documentBreadcrumbAriaLabel);
+        breadcrumb.setAttribute("aria-busy", "true");
         breadcrumb.setAttribute("contenteditable", "false");
-        breadcrumb.hidden = true;
+        breadcrumb.dataset.loading = "true";
 
         const state: EditorState = {
             breadcrumb,
@@ -188,6 +188,8 @@ export class DocumentBreadcrumbFeature {
                 return;
             }
             state.breadcrumb.hidden = true;
+            state.breadcrumb.removeAttribute("aria-busy");
+            delete state.breadcrumb.dataset.loading;
             state.breadcrumb.replaceChildren();
             console.error("Stillmark document breadcrumb failed:", error);
         }
@@ -224,6 +226,8 @@ export class DocumentBreadcrumbFeature {
         state.breadcrumb.replaceChildren();
         if (segments.length === 0) {
             state.breadcrumb.hidden = true;
+            state.breadcrumb.removeAttribute("aria-busy");
+            delete state.breadcrumb.dataset.loading;
             return;
         }
 
@@ -252,6 +256,8 @@ export class DocumentBreadcrumbFeature {
                 state.breadcrumb.append(separator);
             }
         });
+        state.breadcrumb.removeAttribute("aria-busy");
+        delete state.breadcrumb.dataset.loading;
         state.breadcrumb.hidden = false;
         window.requestAnimationFrame(() => {
             state.breadcrumb.scrollLeft = state.breadcrumb.scrollWidth;

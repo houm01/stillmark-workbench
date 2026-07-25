@@ -34,9 +34,11 @@
 * In SiYuan `Setting`, use `direction: "row"` for full-width stacked controls; avoid placing custom full-width containers in `direction: "column"`, which produces oversized mobile layouts.
 * PDF export follows the current editor font by default, allows choosing an installed system font for the current export, and includes H1-H3 bookmarks in the PDF reader's sidebar outline by default without inserting a contents page into the body.
 * PDF export must generate PDF bytes through SiYuan desktop's print-to-PDF bridge and save them with a native file dialog; never invoke the system printer.
+* Keep document switches visually stable: reserve the breadcrumb's final height while its path loads, disable the native title-margin transition beside it, and do not call `expandDocTree` when the target document is already focused in the tree.
 
 ## Verification
 
 * Run `pnpm check` and `git diff --check` before publishing changes.
 * Verify data mutations against a disposable test block before a release.
 * For local runtime verification, back up the served plugin assets, upload the built `dist/` assets through `/api/file/putFile`, and reload with `/api/petal/setPetalEnabled`; verify the served bytes and enabled state after reload. Do not copy files directly into the workspace.
+* For document-switch jump regressions, sample the title position, breadcrumb loading state, and following tree-item position across animation frames; a settled screenshot alone can miss the transient shift.
