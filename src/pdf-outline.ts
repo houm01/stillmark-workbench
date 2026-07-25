@@ -54,6 +54,12 @@ export async function addPdfOutline(pdfBytes: Uint8Array, headings: PdfOutlineHe
     return pdfDocument.save();
 }
 
+export async function setPdfTitle(pdfBytes: Uint8Array, title: string) {
+    const pdfDocument = await pdfLib.PDFDocument.load(pdfBytes, {updateMetadata: false});
+    pdfDocument.setTitle(title, {showInWindowTitleBar: true});
+    return pdfDocument.save();
+}
+
 function getAnnotationUri(pdfDocument: pdfLib.PDFDocument, annotationObject: pdfLib.PDFObject) {
     const annotation = pdfDocument.context.lookup(annotationObject, pdfLib.PDFDict);
     const action = annotation?.lookupMaybe(pdfLib.PDFName.of("A"), pdfLib.PDFDict);

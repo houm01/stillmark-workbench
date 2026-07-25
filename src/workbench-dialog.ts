@@ -4,6 +4,7 @@ import {
     getFrontend,
     showMessage,
 } from "siyuan";
+import {AnnotationsFeature} from "./annotations";
 import {DailyNotesFeature} from "./daily-notes";
 import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {FontSwitcherFeature} from "./font-switcher";
@@ -44,6 +45,7 @@ const ROLE_DEFINITIONS = [
 export class WorkbenchDialogFeature {
     constructor(
         private readonly plugin: Plugin,
+        private readonly annotations: AnnotationsFeature,
         private readonly dailyNotes: DailyNotesFeature,
         private readonly documentBreadcrumb: DocumentBreadcrumbFeature,
         private readonly inlineBacklinks: InlineBacklinksFeature,
@@ -123,6 +125,19 @@ export class WorkbenchDialogFeature {
             description: this.plugin.i18n.documentFindToolDescription,
             status: this.plugin.i18n.available,
             statusState: "primary",
+        }));
+
+        root.append(this.createTool({
+            title: this.plugin.i18n.annotationTool,
+            description: this.plugin.i18n.annotationToolDescription,
+            status: this.plugin.i18n.annotationPanelStatus,
+            statusState: "primary",
+            controls: [
+                this.createButton(this.plugin.i18n.annotationCreate, () => {
+                    dialog.destroy();
+                    this.annotations.createFromCurrentSelection(true);
+                }),
+            ],
         }));
 
         const documentBreadcrumbStatus = this.createStatus(

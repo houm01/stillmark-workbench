@@ -1,21 +1,32 @@
 import {Plugin} from "siyuan";
 
 const STORAGE_NAME = "workbench-preferences.json";
+const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
+const MAX_DISPLAY_NAME_LENGTH = 256;
 
 interface StoredWorkbenchPreferences {
+    annotationContinuousMode?: boolean;
     documentBreadcrumbEnabled?: boolean;
+    inlineBacklinkDisplayNames?: Record<string, unknown>;
     inlineBacklinksEnabled?: boolean;
 }
 
 interface WorkbenchPreferencesState {
+    annotationContinuousMode: boolean;
     documentBreadcrumbEnabled: boolean;
+    inlineBacklinkDisplayNames: Record<string, string>;
     inlineBacklinksEnabled: boolean;
 }
 
-type PreferenceKey = keyof WorkbenchPreferencesState;
+type BooleanPreferenceKey =
+    | "annotationContinuousMode"
+    | "documentBreadcrumbEnabled"
+    | "inlineBacklinksEnabled";
 
 const DEFAULT_PREFERENCES: WorkbenchPreferencesState = {
+    annotationContinuousMode: false,
     documentBreadcrumbEnabled: true,
+    inlineBacklinkDisplayNames: {},
     inlineBacklinksEnabled: true,
 };
 
@@ -46,6 +57,57 @@ export class WorkbenchPreferences {
         await this.setPreference("inlineBacklinksEnabled", enabled);
     }
 
+    async getInlineBacklinkDisplayName(sourceId: string) {
+        await this.readyPromise;
+        return this.state.inlineBacklinkDisplayNames[sourceId];
+    }
+
+    async setInlineBacklinkDisplayName(sourceId: string, displayName?: string) {
+        if (!BLOCK_ID_PATTERN.test(sourceId)) {
+            throw new Error(this.plugin.i18n.workbenchPreferenceSaveFailed);
+        }
+
+        await this.readyPromise;
+        const normalizedName = normalizeDisplayName(displayName);
+        const operation = this.saveQueue.then(async () => {
+            const inlineBacklinkDisplayNames = {
+                ...this.state.inlineBacklinkDisplayNames,
+            };
+            if (normalizedName) {
+                inlineBacklinkDisplayNames[sourceId] = normalizedName;
+            } else {
+                delete inlineBacklinkDisplayNames[sourceId];
+            }
+
+            const nextState: WorkbenchPreferencesState = {
+                ...this.state,
+                inlineBacklinkDisplayNames,
+            };
+            const response = await this.plugin.saveData(STORAGE_NAME, nextState);
+            if (response.code !== 0) {
+                throw new Error(response.msg || this.plugin.i18n.workbenchPreferenceSaveFailed);
+            }
+
+            const readback = await this.plugin.loadData(STORAGE_NAME) as StoredWorkbenchPreferences | undefined;
+            const normalizedReadback = normalizePreferences(readback);
+            if (normalizedReadback.inlineBacklinkDisplayNames[sourceId] !== normalizedName) {
+                throw new Error(this.plugin.i18n.workbenchPreferenceVerificationFailed);
+            }
+            this.state = normalizedReadback;
+        });
+        this.saveQueue = operation.catch(() => undefined);
+        await operation;
+    }
+
+    async isAnnotationContinuousMode() {
+        await this.readyPromise;
+        return this.state.annotationContinuousMode;
+    }
+
+    async setAnnotationContinuousMode(enabled: boolean) {
+        await this.setPreference("annotationContinuousMode", enabled);
+    }
+
     private async load() {
         try {
             const stored = await this.plugin.loadData(STORAGE_NAME) as StoredWorkbenchPreferences | undefined;
@@ -55,7 +117,7 @@ export class WorkbenchPreferences {
         }
     }
 
-    private async setPreference(key: PreferenceKey, enabled: boolean) {
+    private async setPreference(key: BooleanPreferenceKey, enabled: boolean) {
         await this.readyPromise;
         const operation = this.saveQueue.then(async () => {
             const nextState: WorkbenchPreferencesState = {
@@ -80,7 +142,34 @@ export class WorkbenchPreferences {
 
 function normalizePreferences(stored?: StoredWorkbenchPreferences): WorkbenchPreferencesState {
     return {
+        annotationContinuousMode: stored?.annotationContinuousMode === true,
         documentBreadcrumbEnabled: stored?.documentBreadcrumbEnabled !== false,
+        inlineBacklinkDisplayNames: normalizeDisplayNames(stored?.inlineBacklinkDisplayNames),
         inlineBacklinksEnabled: stored?.inlineBacklinksEnabled !== false,
     };
+}
+
+function normalizeDisplayNames(stored?: Record<string, unknown>) {
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+        return {};
+    }
+
+    const displayNames: Record<string, string> = {};
+    Object.entries(stored).forEach(([sourceId, displayName]) => {
+        if (!BLOCK_ID_PATTERN.test(sourceId) || typeof displayName !== "string") {
+            return;
+        }
+        const normalizedName = normalizeDisplayName(displayName);
+        if (normalizedName) {
+            displayNames[sourceId] = normalizedName;
+        }
+    });
+    return displayNames;
+}
+
+function normalizeDisplayName(displayName?: string) {
+    return displayName
+        ?.replace(/[\r\n\u2028\u2029]+/g, " ")
+        .trim()
+        .slice(0, MAX_DISPLAY_NAME_LENGTH) || undefined;
 }

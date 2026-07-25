@@ -11,6 +11,7 @@ import {
 import {
     addPdfOutline,
     type PdfOutlineHeading,
+    setPdfTitle,
 } from "./pdf-outline";
 
 const PDF_EXPORT_STORAGE = "pdf-export.json";
@@ -408,6 +409,7 @@ export class PdfExportFeature {
         Object.entries(data.attrs ?? {}).forEach(([name, value]) => content.setAttribute(name, value));
         content.innerHTML = data.content;
         this.removeDuplicateTitle(content, data.name);
+        this.classifyCodeBlocks(content);
 
         article.append(header, content);
         this.syncOutlineMarkers(article, includeToc);
@@ -448,6 +450,15 @@ export class PdfExportFeature {
         if (normalizeText(firstBlock.textContent) === normalizeText(documentName)) {
             firstBlock.remove();
         }
+    }
+
+    private classifyCodeBlocks(content: HTMLElement) {
+        content.querySelectorAll<HTMLElement>('[data-type="NodeCodeBlock"]').forEach((block) => {
+            const code = block.querySelector<HTMLElement>(".hljs > [contenteditable]") ?? block;
+            const normalized = code.textContent?.replace(/\r/g, "").replace(/\n+$/, "") ?? "";
+            const lineCount = normalized ? normalized.split("\n").length : 0;
+            block.classList.toggle("stillmark-pdf-code--long", lineCount > 16);
+        });
     }
 
     private renderRichContent(root: HTMLElement) {
@@ -628,18 +639,19 @@ export class PdfExportFeature {
             if (!(rawPdfData instanceof Uint8Array) || rawPdfData.byteLength === 0) {
                 throw new Error(this.plugin.i18n.pdfExportUnavailable);
             }
-            if (!session.settings.includeToc) {
-                return rawPdfData;
+            let pdfData = rawPdfData;
+            if (session.settings.includeToc) {
+                session.statusElement.textContent = this.plugin.i18n.pdfExportProcessingOutline;
+                try {
+                    pdfData = await addPdfOutline(rawPdfData, outlineHeadings);
+                } catch (error) {
+                    throw new Error(`${this.plugin.i18n.pdfExportOutlineFailed}: ${errorMessage(error)}`, {
+                        cause: error,
+                    });
+                }
             }
-
-            session.statusElement.textContent = this.plugin.i18n.pdfExportProcessingOutline;
-            try {
-                return await addPdfOutline(rawPdfData, outlineHeadings);
-            } catch (error) {
-                throw new Error(`${this.plugin.i18n.pdfExportOutlineFailed}: ${errorMessage(error)}`, {
-                    cause: error,
-                });
-            }
+            const pdfTitle = normalizeText(session.nameElement.textContent) || "document";
+            return await setPdfTitle(pdfData, pdfTitle);
         } finally {
             this.cleanupPrintRoot();
         }

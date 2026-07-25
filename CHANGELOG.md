@@ -2,6 +2,26 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.3.0 — 2026-07-26
+
+### Added
+
+* Add native selected-text annotations with tag-based styling, optional underlines, multiple notes on the same passage, hover details, per-entry and same-passage group deletion, and a current-page overview.
+* Add editable reference aliases for Linked pages sources and use clearer reference-alias wording in the native interface.
+
+### Changed
+
+* Keep database attribute cards compact and collapsed by default on database-backed document pages.
+
+### Fixed
+
+* Retry annotation attribute readback and compare records semantically to avoid reporting a failed save when SiYuan has already persisted the annotation.
+* Keep document titles, breadcrumbs, and nearby tree items visually stable while switching documents.
+* Prevent long exported tables from overlapping later headings and paragraphs across PDF pages.
+* Use the note name as the PDF document title instead of inheriting the SiYuan window title.
+* Tighten PDF typography and block spacing, soften code blocks, and remove decorative heading rules.
+* Fit exported table columns to their content, prefer single-line cells, override post-render theme padding so code blocks stay at content height, and paginate long code blocks without wasting most of a page.
+
 ## 0.2.1 — 2026-07-25
 
 ### Added
