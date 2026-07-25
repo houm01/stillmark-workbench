@@ -250,6 +250,10 @@
     display: none;
   }
 
+  &[data-loading="true"] {
+    visibility: hidden;
+  }
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -303,6 +307,7 @@
 
 .stillmark-document-breadcrumb:not([hidden]) + .protyle-title {
   margin-top: 4px !important;
+  transition: none !important;
 }
 
 ::highlight(stillmark-document-find-match) {

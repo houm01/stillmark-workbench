@@ -71,6 +71,9 @@ export class DocumentTreeFocusFeature {
         if (generation !== this.locateRequestGeneration || currentProtyle()?.element !== protyle.element) {
             return;
         }
+        if (isDocumentFocusedInTree(protyle.block.rootID)) {
+            return;
+        }
         this.locateProtyle(protyle);
     }
 
@@ -147,6 +150,15 @@ function currentProtyle() {
 
 function isVisible(protyle: IProtyle) {
     return document.contains(protyle.element) && protyle.element.getClientRects().length > 0;
+}
+
+function isDocumentFocusedInTree(documentId?: string) {
+    if (!documentId || !BLOCK_ID_PATTERN.test(documentId)) {
+        return false;
+    }
+    return Boolean(document.querySelector(
+        `.file-tree .b3-list-item--focus[data-node-id="${CSS.escape(documentId)}"]`,
+    ));
 }
 
 function isMobile() {
