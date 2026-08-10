@@ -37,6 +37,10 @@ module.exports = (env, argv) => {
                 filename: "package.zip",
                 algorithm: "gzip",
                 include: [/dist/],
+                fileOptions: {
+                    mtime: new Date(1980, 0, 1, 0, 0, 0),
+                    mode: 0o100644,
+                },
                 pathMapper: (assetPath) => {
                     return assetPath.replace("dist/", "");
                 },
