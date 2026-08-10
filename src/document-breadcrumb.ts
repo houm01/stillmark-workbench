@@ -159,9 +159,12 @@ export class DocumentBreadcrumbFeature {
     }
 
     private mountBreadcrumb(state: EditorState) {
-        const title = state.protyle.title?.element;
-        if (title?.parentElement && state.breadcrumb.nextElementSibling !== title) {
-            title.parentElement.insertBefore(state.breadcrumb, title);
+        const {contentElement, element} = state.protyle;
+        if (
+            contentElement?.parentElement === element &&
+            state.breadcrumb.nextElementSibling !== contentElement
+        ) {
+            element.insertBefore(state.breadcrumb, contentElement);
         }
     }
 
@@ -182,6 +185,8 @@ export class DocumentBreadcrumbFeature {
             if (!this.isCurrent(state, generation)) {
                 return;
             }
+            this.mountBreadcrumb(state);
+            this.syncBreadcrumbMargins(state);
             this.render(state, segments);
         } catch (error) {
             if (!this.isCurrent(state, generation)) {

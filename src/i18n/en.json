@@ -156,7 +156,7 @@
   "documentBreadcrumbOpen": "Open ${name}",
   "documentBreadcrumbSaveFailed": "Failed to save breadcrumb navigation setting",
   "documentBreadcrumbTool": "Note path",
-  "documentBreadcrumbToolDescription": "Show the notebook and parent-document path above the note title, with direct navigation to parent documents.",
+  "documentBreadcrumbToolDescription": "Show the notebook and parent-document path below SiYuan's native breadcrumb, with direct navigation to parent documents.",
   "documentTreeAutoFocus": "Locate opened notes automatically",
   "documentTreeAutoFocusDisabled": "Automatic document-tree location disabled",
   "documentTreeAutoFocusDescription": "Expand and select the current note in the document tree after opening or switching to it.",

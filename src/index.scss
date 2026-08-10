@@ -531,15 +531,16 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 26px;
   overflow-x: auto;
+  background-color: var(--b3-theme-background);
   color: var(--b3-theme-on-surface);
   font-family: var(--b3-font-family);
   font-size: 12px;
   gap: 2px;
   line-height: 22px;
-  margin-top: 10px;
   padding: 2px 0;
   scrollbar-width: none;
   white-space: nowrap;
@@ -601,11 +602,6 @@
     color: color-mix(in srgb, var(--b3-theme-on-surface) 48%, transparent);
     user-select: none;
   }
-}
-
-.stillmark-document-breadcrumb:not([hidden]) + .protyle-title {
-  margin-top: 4px !important;
-  transition: none !important;
 }
 
 ::highlight(stillmark-document-find-match) {
@@ -2220,7 +2216,6 @@ $stillmark-annotation-backgrounds: (
     min-height: 24px;
     font-size: 11px;
     line-height: 20px;
-    margin-top: 8px;
 
     &__item {
       max-width: 120px;

@@ -38,7 +38,7 @@ SiYuan's native `Command + P` global search is unchanged. The plugin does not in
 
 ### Note path
 
-A compact breadcrumb above the note title shows the current notebook and parent-document path. Click a parent to open it in the current tab, or `Command`-click (`Ctrl`-click on Windows/Linux) to open it in a new tab. Long paths stay on one line and scroll to the current note instead of crowding the title or document body. The breadcrumb is enabled by default and can be toggled in the workbench.
+A compact breadcrumb directly below SiYuan's native breadcrumb shows the current notebook and parent-document path. Click a parent to open it in the current tab, or `Command`-click (`Ctrl`-click on Windows/Linux) to open it in a new tab. Long paths stay on one line and scroll to the current note instead of crowding the title or document body. The breadcrumb is enabled by default and can be toggled in the workbench.
 
 ### Linked pages
 
