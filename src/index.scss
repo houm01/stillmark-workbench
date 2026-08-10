@@ -39,6 +39,223 @@
   }
 }
 
+.sy__tag > .stillmark-native-tags__native-host {
+  display: none !important;
+}
+
+.stillmark-native-tags {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--b3-theme-on-background);
+
+  &[hidden] {
+    display: none;
+  }
+
+  &__search {
+    position: relative;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin: 4px 8px 6px;
+
+    > svg {
+      position: absolute;
+      z-index: 1;
+      inset-inline-start: 9px;
+      width: 14px;
+      height: 14px;
+      color: var(--b3-theme-on-surface);
+      pointer-events: none;
+    }
+  }
+
+  &__search-input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 30px;
+    padding: 4px 8px 4px 30px;
+    font-size: 12px;
+  }
+
+  &__tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 6px 8px;
+  }
+
+  &__tag-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 32px;
+    border-radius: 5px;
+    padding-inline-start: calc(var(--stillmark-native-tag-depth, 0) * 16px);
+
+    &:hover {
+      background: var(--b3-list-hover);
+    }
+  }
+
+  &__tag-button,
+  &__search-button,
+  &__document {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+
+  &__tag-button {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    min-width: 0;
+    height: 100%;
+    padding: 0 2px;
+    cursor: pointer;
+
+    > svg {
+      flex: 0 0 16px;
+      width: 16px;
+      height: 16px;
+      margin: 0 6px 0 0;
+      color: var(--b3-theme-on-surface);
+    }
+  }
+
+  &__arrow {
+    transform: rotate(0deg);
+    transition: transform 120ms ease;
+
+    &--expanded {
+      transform: rotate(90deg);
+    }
+  }
+
+  &__tag-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__count {
+    flex: 0 0 auto;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 20px;
+    margin-inline-start: 8px;
+  }
+
+  &__search-button {
+    display: flex;
+    flex: 0 0 26px;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    margin: 0 1px 0 4px;
+    padding: 5px;
+    color: var(--b3-theme-on-surface);
+    cursor: pointer;
+    opacity: 0;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--b3-list-hover);
+      color: var(--b3-theme-primary);
+    }
+
+    > svg {
+      width: 15px;
+      height: 15px;
+    }
+  }
+
+  &__tag-row:hover &__search-button,
+  &__search-button:focus-visible {
+    opacity: 1;
+  }
+
+  &__documents {
+    padding-inline-start: calc(var(--stillmark-native-tag-depth, 0) * 16px + 28px);
+  }
+
+  &__document {
+    display: flex;
+    align-items: flex-start;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 38px;
+    border-radius: 5px;
+    padding: 5px 8px;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--b3-list-hover);
+    }
+
+    > svg {
+      flex: 0 0 15px;
+      width: 15px;
+      height: 15px;
+      margin: 2px 7px 0 0;
+      color: var(--b3-theme-on-surface);
+    }
+  }
+
+  &__document-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  &__document-title,
+  &__document-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__document-title {
+    color: var(--b3-theme-on-background);
+    font-size: 13px;
+    line-height: 17px;
+  }
+
+  &__document-path {
+    color: var(--b3-theme-on-surface);
+    font-size: 11px;
+    line-height: 15px;
+  }
+
+  &__status {
+    box-sizing: border-box;
+    min-height: 30px;
+    padding: 6px 10px;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    line-height: 18px;
+
+    &[data-state="error"] {
+      color: var(--b3-theme-error);
+    }
+  }
+}
+
 .stillmark-workbench {
   box-sizing: border-box;
   display: flex;

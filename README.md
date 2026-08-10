@@ -18,6 +18,12 @@
 
 The upper-right Stillmark Workbench shows every tool and its current status, with direct entry points for daily notes, document-tree location, fonts, and PDF export. Automatic document-tree location, note-path breadcrumbs, and Linked pages can also be toggled there. Settings opened from the workbench provide a direct return action and reopen the workbench after a successful save.
 
+### Tagged documents
+
+SiYuan's native Tags panel becomes a collapsible tree. Click a tag to show its unique related documents and their parent paths directly underneath it; click again to collapse it. The search button on each tag still opens SiYuan's native global search, and the native context menu remains available for renaming or deleting tags.
+
+Use `/` in a tag name to create hierarchy, for example `Clients/LG/SOP`. Opening a parent tag aggregates documents assigned to the parent itself or any descendant tag, with duplicate documents removed. Tags can also be filtered from the field at the top of the panel.
+
 ### Find in document
 
 Press `Command + F` in the document editor (`Ctrl + F` on Windows/Linux) to open a compact find bar in the editor's upper-right corner. The plugin searches only the current document, highlights matches in document order, and supports `Enter` for next, `Shift + Enter` for previous, and `Esc` to close.
@@ -97,6 +103,7 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 
 * Note and block data is accessed only through SiYuan kernel APIs.
 * The plugin does not directly read or write the workspace `data` directory.
+* The tag panel reads tags and related documents only through SiYuan's tag and SQL query APIs; expansion, filtering, and navigation do not modify tags or document content.
 * Find in document reads only the current document through SiYuan's search API and never changes block content.
 * Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
 * Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.

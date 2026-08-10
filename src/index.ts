@@ -13,6 +13,7 @@ import {DocumentFindFeature} from "./document-find";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
 import {InlineBacklinksFeature} from "./inline-backlinks";
+import {NativeTagBrowserFeature} from "./native-tag-browser";
 import {PdfExportFeature} from "./pdf-export";
 import {ReferenceAliasLabelFeature} from "./reference-alias-label";
 import {WorkbenchDialogFeature} from "./workbench-dialog";
@@ -51,6 +52,7 @@ export default class StillmarkWorkbench extends Plugin {
     private documentTreeFocus?: DocumentTreeFocusFeature;
     private fontSwitcher?: FontSwitcherFeature;
     private inlineBacklinks?: InlineBacklinksFeature;
+    private nativeTagBrowser?: NativeTagBrowserFeature;
     private pdfExport?: PdfExportFeature;
     private referenceAliasLabel?: ReferenceAliasLabelFeature;
     private workbench?: WorkbenchDialogFeature;
@@ -142,6 +144,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.inlineBacklinks = new InlineBacklinksFeature(this, this.workbenchPreferences);
         this.inlineBacklinks.onload();
 
+        this.nativeTagBrowser = new NativeTagBrowserFeature(this);
+        this.nativeTagBrowser.onload();
+
         this.pdfExport = new PdfExportFeature(this);
         this.pdfExport.onload();
 
@@ -175,6 +180,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.documentTreeFocus?.onLayoutReady();
         this.fontSwitcher?.onLayoutReady();
         this.inlineBacklinks?.onLayoutReady();
+        this.nativeTagBrowser?.onLayoutReady();
         this.pdfExport?.onLayoutReady();
     }
 
@@ -186,6 +192,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.documentFind?.onunload();
         this.documentTreeFocus?.onunload();
         this.inlineBacklinks?.onunload();
+        this.nativeTagBrowser?.onunload();
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
         this.referenceAliasLabel?.onunload();
