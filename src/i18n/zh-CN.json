@@ -156,7 +156,7 @@
   "documentBreadcrumbOpen": "打开 ${name}",
   "documentBreadcrumbSaveFailed": "保存面包屑导航设置失败",
   "documentBreadcrumbTool": "笔记路径",
-  "documentBreadcrumbToolDescription": "在笔记标题上方显示笔记本与上级文档路径，点击上级文档可直接跳转。",
+  "documentBreadcrumbToolDescription": "在原生面包屑下方显示笔记本与上级文档路径，点击上级文档可直接跳转。",
   "documentTreeAutoFocus": "打开笔记后自动定位",
   "documentTreeAutoFocusDisabled": "已关闭打开笔记后自动定位",
   "documentTreeAutoFocusDescription": "打开或切换到笔记后，自动在左侧文档树中展开并选中当前笔记。",

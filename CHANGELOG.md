@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## Unreleased
+
+### Changed
+
+* Move the note-path breadcrumb directly below SiYuan's native breadcrumb while keeping it independent from the native breadcrumb DOM.
+
 ## 0.4.1 — 2026-08-10
 
 ### Added
