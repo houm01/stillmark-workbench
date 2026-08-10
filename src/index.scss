@@ -4,14 +4,27 @@
   svg {
     color: color-mix(
       in srgb,
-      var(--stillmark-topbar-icon-color) 84%,
-      var(--b3-theme-on-background)
+      var(--stillmark-topbar-icon-color) 14%,
+      var(--b3-theme-on-surface)
     );
+    transition: color 120ms ease;
   }
 
   &:hover svg,
   &:focus-visible svg {
-    color: var(--stillmark-topbar-icon-color);
+    color: color-mix(
+      in srgb,
+      var(--stillmark-topbar-icon-color) 52%,
+      var(--b3-theme-on-background)
+    );
+  }
+
+  &[aria-expanded="true"] svg {
+    color: color-mix(
+      in srgb,
+      var(--stillmark-topbar-icon-color) 64%,
+      var(--b3-theme-on-background)
+    );
   }
 
   &--daily-note {
@@ -37,6 +50,10 @@
   &--workbench {
     --stillmark-topbar-icon-color: #b86428;
   }
+}
+
+.stillmark-feature-disabled {
+  display: none !important;
 }
 
 .sy__tag > .stillmark-native-tags__native-host {
@@ -256,16 +273,49 @@
   }
 }
 
+.stillmark-workbench-dialog .b3-dialog__container {
+  height: auto;
+  max-height: calc(100dvh - 16px);
+}
+
 .stillmark-workbench {
   box-sizing: border-box;
+  container-type: inline-size;
   display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
   flex-direction: column;
   gap: 8px;
-  max-height: min(620px, 72vh);
-  overflow: auto;
+  max-height: min(680px, calc(100dvh - 112px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--b3-theme-on-background);
 
+  &__bulk-actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 2px 2px;
+  }
+
+  &__bulk-label {
+    min-width: 0;
+    margin-right: auto;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    line-height: 28px;
+  }
+
+  &__bulk-button {
+    min-width: 68px;
+  }
+
   &__tool {
+    min-width: 0;
     border: 1px solid var(--b3-border-color);
     border-radius: 8px;
     background: var(--b3-theme-surface);
@@ -273,10 +323,10 @@
   }
 
   &__tool-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 20px;
+    gap: 12px;
   }
 
   &__tool-copy {
@@ -304,7 +354,8 @@
 
   &__controls {
     display: flex;
-    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
@@ -344,6 +395,11 @@
     padding-right: 10px;
     padding-left: 10px;
     white-space: nowrap;
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.45;
+    }
   }
 
   &__switch {
@@ -357,6 +413,10 @@
 
     .b3-switch {
       flex: 0 0 auto;
+    }
+
+    &[aria-disabled="true"] {
+      opacity: 0.48;
     }
   }
 
@@ -384,6 +444,23 @@
 
   &__usage {
     margin-top: 8px;
+  }
+}
+
+@container (max-width: 520px) {
+  .stillmark-workbench__tool-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 9px;
+  }
+
+  .stillmark-workbench__controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .stillmark-workbench__status {
+    margin-right: auto;
   }
 }
 
@@ -2167,25 +2244,6 @@ $stillmark-annotation-backgrounds: (
     &__source-row {
       padding-right: 6px;
       padding-left: 6px;
-    }
-  }
-
-  .stillmark-workbench {
-    max-height: 72vh;
-
-    &__tool-header {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    &__controls {
-      width: 100%;
-      justify-content: flex-start;
-    }
-
-    &__status {
-      margin-right: auto;
     }
   }
 

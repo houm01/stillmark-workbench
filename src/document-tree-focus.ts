@@ -8,6 +8,7 @@ import {
     getFrontend,
     showMessage,
 } from "siyuan";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
 const CONTEXT_MENU_VERTICAL_GAP = 20;
@@ -19,7 +20,9 @@ export interface DocumentTreeFocusPreferences {
 }
 
 export class DocumentTreeFocusFeature {
+    private enabled = true;
     private locateRequestGeneration = 0;
+    private mounted = false;
     private topBarElement?: HTMLElement;
 
     private readonly editorChangedHandler = ({detail}: CustomEvent<{protyle: IProtyle;}>) => {
@@ -36,11 +39,12 @@ export class DocumentTreeFocusFeature {
     constructor(
         private readonly plugin: Plugin,
         private readonly preferences: DocumentTreeFocusPreferences,
+        private readonly workbenchPreferences: WorkbenchPreferences,
     ) {}
 
     onload() {
-        this.plugin.eventBus.on("loaded-protyle-static", this.editorChangedHandler);
-        this.plugin.eventBus.on("switch-protyle", this.editorChangedHandler);
+        this.enabled = this.workbenchPreferences.isFeatureEnabledCached("documentTreeFocus");
+        this.mount();
     }
 
     onLayoutReady() {
@@ -51,6 +55,7 @@ export class DocumentTreeFocusFeature {
             callback: () => this.locateCurrentDocument(),
         });
         this.topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--focus");
+        this.syncTopBarVisibility();
 
         if (!isMobile()) {
             this.topBarElement.addEventListener("contextmenu", this.contextMenuHandler);
@@ -58,14 +63,27 @@ export class DocumentTreeFocusFeature {
     }
 
     onunload() {
-        ++this.locateRequestGeneration;
-        this.plugin.eventBus.off("loaded-protyle-static", this.editorChangedHandler);
-        this.plugin.eventBus.off("switch-protyle", this.editorChangedHandler);
+        this.unmount();
         this.topBarElement?.removeEventListener("contextmenu", this.contextMenuHandler);
     }
 
+    async isEnabled() {
+        return this.workbenchPreferences.isFeatureEnabled("documentTreeFocus");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.workbenchPreferences.setFeatureEnabled("documentTreeFocus", enabled);
+        this.enabled = enabled;
+        if (enabled) {
+            this.mount();
+        } else {
+            this.unmount();
+        }
+        this.syncTopBarVisibility();
+    }
+
     private async locateDocumentIfEnabled(protyle: IProtyle, generation: number) {
-        if (!await this.preferences.shouldAutoLocateInTreeOnOpen()) {
+        if (!this.enabled || !await this.preferences.shouldAutoLocateInTreeOnOpen()) {
             return;
         }
         if (generation !== this.locateRequestGeneration || currentProtyle()?.element !== protyle.element) {
@@ -117,6 +135,9 @@ export class DocumentTreeFocusFeature {
     }
 
     private locateCurrentDocument() {
+        if (!this.enabled) {
+            return;
+        }
         const protyle = currentProtyle();
         if (!protyle || !this.locateProtyle(protyle)) {
             showMessage(this.plugin.i18n.documentTreeFocusUnavailable, 4000, "error");
@@ -130,6 +151,29 @@ export class DocumentTreeFocusFeature {
         }
         expandDocTree({id: documentId, isSetCurrent: true});
         return true;
+    }
+
+    private mount() {
+        if (!this.enabled || this.mounted) {
+            return;
+        }
+        this.mounted = true;
+        this.plugin.eventBus.on("loaded-protyle-static", this.editorChangedHandler);
+        this.plugin.eventBus.on("switch-protyle", this.editorChangedHandler);
+    }
+
+    private unmount() {
+        if (!this.mounted) {
+            return;
+        }
+        this.mounted = false;
+        ++this.locateRequestGeneration;
+        this.plugin.eventBus.off("loaded-protyle-static", this.editorChangedHandler);
+        this.plugin.eventBus.off("switch-protyle", this.editorChangedHandler);
+    }
+
+    private syncTopBarVisibility() {
+        this.topBarElement?.classList.toggle("stillmark-feature-disabled", !this.enabled);
     }
 }
 

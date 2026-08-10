@@ -2,15 +2,23 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
-## Unreleased
+## 0.4.0 — 2026-08-10
 
 ### Added
 
 * Expand tags in SiYuan's native tag panel to show unique related documents, with slash-delimited hierarchy, parent-tag aggregation, filtering, and preserved native search and context actions.
+* Show the macOS PingFang Simplified, Traditional, Hong Kong, and Macau families in the editor and PDF font pickers, including the available editor font weights omitted by SiYuan's system-font API.
+* Add persistent master switches for every tool shown in the workbench, including bulk enable/disable controls and full annotation entry-point and runtime cleanup without deleting stored annotations.
+
+### Changed
+
+* Align plugin-owned top-bar icons with SiYuan's restrained line-icon language while keeping subtle feature accents.
+* Make workbench rows respond to the dialog's actual width and keep the dialog content-height sized while the application window changes.
 
 ### Fixed
 
-* Open documents from the enhanced native tag panel with SiYuan's explicit editor-focus action.
+* Activate the destination editor tab when opening a document from the enhanced native tag panel.
+* Flush SiYuan's pending attribute index writes and verify annotation mutations against persisted attributes instead of the potentially stale block-attribute cache, with a longer compatibility retry fallback.
 
 ## 0.3.0 — 2026-07-26
 

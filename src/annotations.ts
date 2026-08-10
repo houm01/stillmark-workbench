@@ -38,11 +38,13 @@ import {
     resolveAnnotationRange,
     selectionFromRecord,
 } from "./annotation-model";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
+const ANNOTATION_DOCK_TYPE = "stillmark-annotations";
 const HIGHLIGHT_REFRESH_DELAY_MS = 120;
 const PANEL_REFRESH_DELAY_MS = 180;
-const SAVE_VERIFICATION_DELAYS_MS = [0, 80, 160, 320, 640] as const;
+const SAVE_VERIFICATION_DELAYS_MS = [0, 80, 160, 320, 640, 1280, 2560] as const;
 const OPEN_BLOCK_ACTIONS: TProtyleAction[] = [
     "cb-get-focus",
     "cb-get-context",
@@ -58,6 +60,10 @@ const ANNOTATION_BACKGROUND_HIGHLIGHT_NAMES = ANNOTATION_BACKGROUND_COLORS
 interface AnnotationSqlRow {
     id?: string;
     root_id?: string;
+}
+
+interface AnnotationAttributeSqlRow {
+    value?: string | null;
 }
 
 interface RenderedAnnotation {
@@ -85,17 +91,20 @@ export class AnnotationsFeature {
     private activeRootId = "";
     private blockSaveQueues = new Map<string, Promise<void>>();
     private currentHighlightTimer?: number;
+    private dockVisibilityTimer?: number;
     private dockCount?: HTMLElement;
     private dockEmpty?: HTMLElement;
     private dockFilters?: HTMLElement;
     private dockList?: HTMLElement;
     private dockRoot?: HTMLElement;
     private dockSearch?: HTMLInputElement;
+    private enabled = true;
     private highlightRefreshTimer?: number;
     private hoverHideTimer?: number;
     private hoverKey = "";
     private hoverRoot?: HTMLElement;
     private items: AnnotationListItem[] = [];
+    private mounted = false;
     private overviewButton?: HTMLElement;
     private overviewCount?: HTMLElement;
     private overviewEmpty?: HTMLElement;
@@ -213,11 +222,19 @@ export class AnnotationsFeature {
 
     private readonly scrollHandler = () => this.hideAnnotationHover();
 
-    constructor(private readonly plugin: Plugin) {}
+    constructor(
+        private readonly plugin: Plugin,
+        private readonly preferences: WorkbenchPreferences,
+    ) {}
 
     onload() {
+        this.enabled = this.preferences.isFeatureEnabledCached("annotations");
         this.plugin.addCommand({
-            editorCallback: () => this.createFromCurrentSelection(true),
+            editorCallback: () => {
+                if (this.enabled) {
+                    this.createFromCurrentSelection(true);
+                }
+            },
             hotkey: "⌥⌘C",
             langKey: "annotationCreateCommand",
         });
@@ -239,9 +256,16 @@ export class AnnotationsFeature {
                     this.mountDock(custom.element);
                 }
             },
-            type: "stillmark-annotations",
+            type: ANNOTATION_DOCK_TYPE,
         });
+        this.mount();
+    }
 
+    private mount() {
+        if (!this.enabled || this.mounted) {
+            return;
+        }
+        this.mounted = true;
         this.plugin.eventBus.on("destroy-protyle", this.destroyProtyleHandler);
         this.plugin.eventBus.on("loaded-protyle-static", this.editorChangedHandler);
         this.plugin.eventBus.on("switch-protyle", this.editorChangedHandler);
@@ -254,6 +278,9 @@ export class AnnotationsFeature {
         document.addEventListener("keydown", this.keydownHandler, true);
         document.addEventListener("scroll", this.scrollHandler, true);
         window.addEventListener("resize", this.resizeHandler);
+        this.activeRootId = getActiveEditor()?.protyle.block.rootID ?? "";
+        this.scheduleHighlightRefresh(0);
+        this.schedulePanelRefresh(0);
     }
 
     onLayoutReady() {
@@ -272,12 +299,41 @@ export class AnnotationsFeature {
             );
             this.overviewButton.setAttribute("aria-expanded", "false");
         }
-        this.activeRootId = getActiveEditor()?.protyle.block.rootID ?? "";
-        this.scheduleHighlightRefresh(0);
-        this.schedulePanelRefresh(0);
+        this.syncFeatureVisibility();
+        if (this.enabled) {
+            this.activeRootId = getActiveEditor()?.protyle.block.rootID ?? "";
+            this.scheduleHighlightRefresh(0);
+            this.schedulePanelRefresh(0);
+        }
     }
 
     onunload() {
+        this.unmount();
+        window.clearTimeout(this.dockVisibilityTimer);
+    }
+
+    isEnabledCached() {
+        return this.enabled;
+    }
+
+    async isEnabled() {
+        return this.preferences.isFeatureEnabled("annotations");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.preferences.setFeatureEnabled("annotations", enabled);
+        this.enabled = enabled;
+        if (enabled) {
+            this.mount();
+        } else {
+            this.unmount();
+        }
+        this.syncFeatureVisibility();
+        this.refreshProtyleToolbars();
+    }
+
+    private unmount() {
+        this.mounted = false;
         this.plugin.eventBus.off("destroy-protyle", this.destroyProtyleHandler);
         this.plugin.eventBus.off("loaded-protyle-static", this.editorChangedHandler);
         this.plugin.eventBus.off("switch-protyle", this.editorChangedHandler);
@@ -299,7 +355,33 @@ export class AnnotationsFeature {
         CSS.highlights.delete("stillmark-annotation-current");
     }
 
+    private syncFeatureVisibility() {
+        this.overviewButton?.classList.toggle("stillmark-feature-disabled", !this.enabled);
+        window.clearTimeout(this.dockVisibilityTimer);
+        this.dockVisibilityTimer = window.setTimeout(() => {
+            this.dockVisibilityTimer = undefined;
+            const type = `${this.plugin.name}${ANNOTATION_DOCK_TYPE}`;
+            const selector = `[data-type="${CSS.escape(type)}"]`;
+            document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+                if (!this.enabled && element.classList.contains("dock__item--active")) {
+                    element.click();
+                }
+                element.classList.toggle("stillmark-feature-disabled", !this.enabled);
+            });
+            document.querySelectorAll<HTMLElement>(`.sy__${CSS.escape(type)}`).forEach((element) => {
+                element.classList.toggle("stillmark-feature-disabled", !this.enabled);
+            });
+        }, 0);
+    }
+
+    private refreshProtyleToolbars() {
+        getAllEditor().forEach((editor) => editor.protyle.toolbar?.update(editor.protyle));
+    }
+
     createFromCurrentSelection(reportFailure = false) {
+        if (!this.enabled) {
+            return;
+        }
         const selection = this.captureCurrentSelection();
         if (!selection) {
             if (reportFailure) {
@@ -311,6 +393,9 @@ export class AnnotationsFeature {
     }
 
     createFromProtyleToolbar(instance: Protyle) {
+        if (!this.enabled) {
+            return;
+        }
         const protyle = instance.protyle;
         const range = protyle.toolbar?.range?.cloneRange();
         const selection = range ? this.captureRangeSelection(range, protyle) : null;
@@ -384,7 +469,7 @@ export class AnnotationsFeature {
     ) {
         try {
             await this.queueBlockSave(selection.blockId, async () => {
-                const records = await this.readBlockAnnotations(selection.blockId);
+                const records = await this.readPersistedBlockAnnotations(selection.blockId);
                 const now = Date.now();
                 const style = annotationStyleForTag(value.tag);
                 const nextRecord = existing ?
@@ -431,7 +516,7 @@ export class AnnotationsFeature {
     private async deleteAnnotation(blockId: string, annotationId: string) {
         try {
             await this.queueBlockSave(blockId, async () => {
-                const records = await this.readBlockAnnotations(blockId);
+                const records = await this.readPersistedBlockAnnotations(blockId);
                 const nextRecords = records.filter((record) => record.id !== annotationId);
                 if (nextRecords.length === records.length) {
                     throw new Error(this.plugin.i18n.annotationMissing);
@@ -496,7 +581,7 @@ export class AnnotationsFeature {
             blockTargets.map(async ([blockId, annotationIds]) => {
                 let deletedCount = 0;
                 await this.queueBlockSave(blockId, async () => {
-                    const records = await this.readBlockAnnotations(blockId);
+                    const records = await this.readPersistedBlockAnnotations(blockId);
                     const nextRecords = records.filter((record) => !annotationIds.has(record.id));
                     deletedCount = records.length - nextRecords.length;
                     if (deletedCount > 0) {
@@ -559,6 +644,23 @@ export class AnnotationsFeature {
         return parseAnnotations(attrs?.[ANNOTATION_ATTRIBUTE]);
     }
 
+    private async readPersistedBlockAnnotations(blockId: string) {
+        if (!BLOCK_ID_PATTERN.test(blockId)) {
+            throw new Error(this.plugin.i18n.annotationLoadFailed);
+        }
+        const response = await fetchSyncPost("/api/query/sql", {
+            stmt:
+                `SELECT a.value FROM blocks b LEFT JOIN attributes a ON a.block_id = b.id AND a.name = '${ANNOTATION_ATTRIBUTE}' WHERE b.id = '${blockId}' LIMIT 1`,
+        });
+        if (response.code === 0) {
+            const rows = response.data as AnnotationAttributeSqlRow[] | null;
+            if (rows?.[0]) {
+                return parseAnnotations(rows[0].value);
+            }
+        }
+        return this.readBlockAnnotations(blockId);
+    }
+
     private async writeBlockAnnotations(blockId: string, records: AnnotationRecord[]) {
         const encoded = encodeAnnotations(records);
         const response = await fetchSyncPost("/api/attr/setBlockAttrs", {
@@ -571,12 +673,14 @@ export class AnnotationsFeature {
             throw new Error(response.msg || this.plugin.i18n.annotationSaveFailed);
         }
 
+        await fetchSyncPost("/api/sqlite/flushTransaction", {}).catch(() => undefined);
+
         let verified = false;
         for (const delayMilliseconds of SAVE_VERIFICATION_DELAYS_MS) {
             if (delayMilliseconds > 0) {
                 await delay(delayMilliseconds);
             }
-            const readback = await this.readBlockAnnotations(blockId);
+            const readback = await this.readPersistedBlockAnnotations(blockId);
             if (annotationRecordsEqual(readback, records)) {
                 verified = true;
                 break;
@@ -938,7 +1042,7 @@ export class AnnotationsFeature {
     }
 
     private schedulePanelRefresh(delay = PANEL_REFRESH_DELAY_MS) {
-        if (!this.dockRoot && !this.overviewRoot) {
+        if (!this.enabled || (!this.dockRoot && !this.overviewRoot)) {
             return;
         }
         window.clearTimeout(this.panelRefreshTimer);
@@ -948,6 +1052,9 @@ export class AnnotationsFeature {
     }
 
     private async refreshPanel() {
+        if (!this.enabled) {
+            return;
+        }
         const rootId = getActiveEditor()?.protyle.block.rootID ?? this.activeRootId;
         this.activeRootId = rootId;
         if (!BLOCK_ID_PATTERN.test(rootId)) {

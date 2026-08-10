@@ -59,6 +59,9 @@ export default class StillmarkWorkbench extends Plugin {
     private workbenchPreferences?: WorkbenchPreferences;
 
     private readonly blockMenuHandler = ({detail}: CustomEvent<BlockMenuDetail>) => {
+        if (!this.workbenchPreferences?.isFeatureEnabledCached("blockRoles")) {
+            return;
+        }
         detail.menu.addItem({
             id: "stillmark-workbench-block-role",
             icon: "iconStillmarkWorkbench",
@@ -85,6 +88,9 @@ export default class StillmarkWorkbench extends Plugin {
     };
 
     updateProtyleToolbar(toolbar: Parameters<Plugin["updateProtyleToolbar"]>[0]) {
+        if (!this.annotations?.isEnabledCached()) {
+            return toolbar;
+        }
         return [
             ...toolbar,
             {
@@ -97,13 +103,18 @@ export default class StillmarkWorkbench extends Plugin {
         ];
     }
 
-    onload() {
-        this.addIcons(`<symbol id="iconStillmarkWorkbench" viewBox="0 0 32 32">
-<path d="M5 7.5h22v17H5zM9 12h14M9 16h9M9 20h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    async onload() {
+        this.workbenchPreferences = new WorkbenchPreferences(this);
+        await this.workbenchPreferences.ready();
+
+        this.addIcons(
+            `<symbol id="iconStillmarkWorkbench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path>
 </symbol>
-<symbol id="iconStillmarkAnnotation" viewBox="0 0 32 32">
-<path d="M7 6h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H14l-7 5v-5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM10 12h12M10 16h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-</symbol>`);
+<symbol id="iconStillmarkAnnotation" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM8 9h8M8 13h5"></path>
+</symbol>`,
+        );
 
         this.addCommand({
             langKey: "openWorkbench",
@@ -115,30 +126,32 @@ export default class StillmarkWorkbench extends Plugin {
 
         this.eventBus.on("click-blockicon", this.blockMenuHandler);
 
-        this.dailyNotes = new DailyNotesFeature(this);
+        this.dailyNotes = new DailyNotesFeature(this, this.workbenchPreferences);
         this.dailyNotes.onload();
 
         this.databasePage = new DatabasePageFeature(this);
         this.databasePage.onload();
 
-        this.workbenchPreferences = new WorkbenchPreferences(this);
-
         this.referenceAliasLabel = new ReferenceAliasLabelFeature(this);
         this.referenceAliasLabel.onload();
 
-        this.annotations = new AnnotationsFeature(this);
+        this.annotations = new AnnotationsFeature(this, this.workbenchPreferences);
         this.annotations.onload();
 
         this.documentBreadcrumb = new DocumentBreadcrumbFeature(this, this.workbenchPreferences);
         this.documentBreadcrumb.onload();
 
-        this.documentFind = new DocumentFindFeature(this);
+        this.documentFind = new DocumentFindFeature(this, this.workbenchPreferences);
         this.documentFind.onload();
 
-        this.documentTreeFocus = new DocumentTreeFocusFeature(this, this.dailyNotes);
+        this.documentTreeFocus = new DocumentTreeFocusFeature(
+            this,
+            this.dailyNotes,
+            this.workbenchPreferences,
+        );
         this.documentTreeFocus.onload();
 
-        this.fontSwitcher = new FontSwitcherFeature(this);
+        this.fontSwitcher = new FontSwitcherFeature(this, this.workbenchPreferences);
         this.fontSwitcher.onload();
 
         this.inlineBacklinks = new InlineBacklinksFeature(this, this.workbenchPreferences);
@@ -147,17 +160,20 @@ export default class StillmarkWorkbench extends Plugin {
         this.nativeTagBrowser = new NativeTagBrowserFeature(this);
         this.nativeTagBrowser.onload();
 
-        this.pdfExport = new PdfExportFeature(this);
+        this.pdfExport = new PdfExportFeature(this, this.workbenchPreferences);
         this.pdfExport.onload();
 
         this.workbench = new WorkbenchDialogFeature(
             this,
             this.annotations,
             this.dailyNotes,
+            this.documentFind,
             this.documentBreadcrumb,
+            this.documentTreeFocus,
             this.inlineBacklinks,
             this.fontSwitcher,
             this.pdfExport,
+            this.workbenchPreferences,
         );
     }
 
