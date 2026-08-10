@@ -2,6 +2,16 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## Unreleased
+
+### Added
+
+* Expand tags in SiYuan's native tag panel to show unique related documents, with slash-delimited hierarchy, parent-tag aggregation, filtering, and preserved native search and context actions.
+
+### Fixed
+
+* Open documents from the enhanced native tag panel with SiYuan's explicit editor-focus action.
+
 ## 0.3.0 — 2026-07-26
 
 ### Added
