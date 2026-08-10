@@ -24,6 +24,12 @@ SiYuan's native Tags panel becomes a collapsible tree. Click a tag to show its u
 
 Use `/` in a tag name to create hierarchy, for example `Clients/LG/SOP`. Opening a parent tag aggregates documents assigned to the parent itself or any descendant tag, with duplicate documents removed. Tags can also be filtered from the field at the top of the panel.
 
+### Stillmark theme enhancements
+
+When the Stillmark theme is active, external links load the source site's `/favicon.ico` directly with no referrer and fall back to the theme's neutral globe icon when unavailable. Bookmark groups remain single-line and compact; only duplicate titles receive a parent-path subtitle, with notebook and document-time context added when needed.
+
+These enhancements change only runtime presentation. They do not add elements, classes, or styles to document content and do not depend on a third-party favicon service.
+
 ### Find in document
 
 Press `Command + F` in the document editor (`Ctrl + F` on Windows/Linux) to open a compact find bar in the editor's upper-right corner. The plugin searches only the current document, highlights matches in document order, and supports `Enter` for next, `Shift + Enter` for previous, and `Esc` to close.
@@ -105,6 +111,7 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 * The plugin does not directly read or write the workspace `data` directory.
 * The tag panel reads tags and related documents only through SiYuan's tag and SQL query APIs; expansion, filtering, and navigation do not modify tags or document content.
 * Find in document reads only the current document through SiYuan's search API and never changes block content.
+* Stillmark theme enhancements read bookmark paths through SiYuan's file-tree APIs and never change bookmarks or document content.
 * Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
 * Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.
 * Daily notes are written only to the explicitly configured, currently open notebook.
