@@ -6,28 +6,79 @@ const MAX_DISPLAY_NAME_LENGTH = 256;
 
 interface StoredWorkbenchPreferences {
     annotationContinuousMode?: boolean;
+    annotationsEnabled?: boolean;
+    blockRolesEnabled?: boolean;
+    dailyNotesEnabled?: boolean;
     documentBreadcrumbEnabled?: boolean;
+    documentFindEnabled?: boolean;
+    documentTreeFocusEnabled?: boolean;
+    fontSwitcherEnabled?: boolean;
     inlineBacklinkDisplayNames?: Record<string, unknown>;
     inlineBacklinksEnabled?: boolean;
+    pdfExportEnabled?: boolean;
 }
 
 interface WorkbenchPreferencesState {
     annotationContinuousMode: boolean;
+    annotationsEnabled: boolean;
+    blockRolesEnabled: boolean;
+    dailyNotesEnabled: boolean;
     documentBreadcrumbEnabled: boolean;
+    documentFindEnabled: boolean;
+    documentTreeFocusEnabled: boolean;
+    fontSwitcherEnabled: boolean;
     inlineBacklinkDisplayNames: Record<string, string>;
     inlineBacklinksEnabled: boolean;
+    pdfExportEnabled: boolean;
 }
 
 type BooleanPreferenceKey =
     | "annotationContinuousMode"
+    | "annotationsEnabled"
+    | "blockRolesEnabled"
+    | "dailyNotesEnabled"
     | "documentBreadcrumbEnabled"
-    | "inlineBacklinksEnabled";
+    | "documentFindEnabled"
+    | "documentTreeFocusEnabled"
+    | "fontSwitcherEnabled"
+    | "inlineBacklinksEnabled"
+    | "pdfExportEnabled";
+
+export type WorkbenchFeature =
+    | "annotations"
+    | "blockRoles"
+    | "dailyNotes"
+    | "documentBreadcrumb"
+    | "documentFind"
+    | "documentTreeFocus"
+    | "fontSwitcher"
+    | "inlineBacklinks"
+    | "pdfExport";
+
+const FEATURE_PREFERENCE_KEYS: Record<WorkbenchFeature, BooleanPreferenceKey> = {
+    annotations: "annotationsEnabled",
+    blockRoles: "blockRolesEnabled",
+    dailyNotes: "dailyNotesEnabled",
+    documentBreadcrumb: "documentBreadcrumbEnabled",
+    documentFind: "documentFindEnabled",
+    documentTreeFocus: "documentTreeFocusEnabled",
+    fontSwitcher: "fontSwitcherEnabled",
+    inlineBacklinks: "inlineBacklinksEnabled",
+    pdfExport: "pdfExportEnabled",
+};
 
 const DEFAULT_PREFERENCES: WorkbenchPreferencesState = {
     annotationContinuousMode: false,
+    annotationsEnabled: true,
+    blockRolesEnabled: true,
+    dailyNotesEnabled: true,
     documentBreadcrumbEnabled: true,
+    documentFindEnabled: true,
+    documentTreeFocusEnabled: true,
+    fontSwitcherEnabled: true,
     inlineBacklinkDisplayNames: {},
     inlineBacklinksEnabled: true,
+    pdfExportEnabled: true,
 };
 
 export class WorkbenchPreferences {
@@ -39,22 +90,37 @@ export class WorkbenchPreferences {
         this.readyPromise = this.load();
     }
 
-    async isDocumentBreadcrumbEnabled() {
+    ready() {
+        return this.readyPromise;
+    }
+
+    async isFeatureEnabled(feature: WorkbenchFeature) {
         await this.readyPromise;
-        return this.state.documentBreadcrumbEnabled;
+        return this.isFeatureEnabledCached(feature);
+    }
+
+    isFeatureEnabledCached(feature: WorkbenchFeature) {
+        return this.state[FEATURE_PREFERENCE_KEYS[feature]];
+    }
+
+    async setFeatureEnabled(feature: WorkbenchFeature, enabled: boolean) {
+        await this.setPreference(FEATURE_PREFERENCE_KEYS[feature], enabled);
+    }
+
+    async isDocumentBreadcrumbEnabled() {
+        return this.isFeatureEnabled("documentBreadcrumb");
     }
 
     async setDocumentBreadcrumbEnabled(enabled: boolean) {
-        await this.setPreference("documentBreadcrumbEnabled", enabled);
+        await this.setFeatureEnabled("documentBreadcrumb", enabled);
     }
 
     async isInlineBacklinksEnabled() {
-        await this.readyPromise;
-        return this.state.inlineBacklinksEnabled;
+        return this.isFeatureEnabled("inlineBacklinks");
     }
 
     async setInlineBacklinksEnabled(enabled: boolean) {
-        await this.setPreference("inlineBacklinksEnabled", enabled);
+        await this.setFeatureEnabled("inlineBacklinks", enabled);
     }
 
     async getInlineBacklinkDisplayName(sourceId: string) {
@@ -143,9 +209,16 @@ export class WorkbenchPreferences {
 function normalizePreferences(stored?: StoredWorkbenchPreferences): WorkbenchPreferencesState {
     return {
         annotationContinuousMode: stored?.annotationContinuousMode === true,
+        annotationsEnabled: stored?.annotationsEnabled !== false,
+        blockRolesEnabled: stored?.blockRolesEnabled !== false,
+        dailyNotesEnabled: stored?.dailyNotesEnabled !== false,
         documentBreadcrumbEnabled: stored?.documentBreadcrumbEnabled !== false,
+        documentFindEnabled: stored?.documentFindEnabled !== false,
+        documentTreeFocusEnabled: stored?.documentTreeFocusEnabled !== false,
+        fontSwitcherEnabled: stored?.fontSwitcherEnabled !== false,
         inlineBacklinkDisplayNames: normalizeDisplayNames(stored?.inlineBacklinkDisplayNames),
         inlineBacklinksEnabled: stored?.inlineBacklinksEnabled !== false,
+        pdfExportEnabled: stored?.pdfExportEnabled !== false,
     };
 }
 

@@ -6,6 +6,7 @@ import {
     getFrontend,
     openTab,
 } from "siyuan";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
 const SEARCH_DEBOUNCE_MS = 140;
@@ -42,8 +43,10 @@ interface LoadedRange {
 
 export class DocumentFindFeature {
     private currentIndex = -1;
+    private enabled = true;
     private input?: HTMLInputElement;
     private matches: DocumentMatch[] = [];
+    private mounted = false;
     private nextButton?: HTMLButtonElement;
     private notebookId = "";
     private navigationGeneration = 0;
@@ -112,19 +115,51 @@ export class DocumentFindFeature {
         this.open(protyle);
     };
 
-    constructor(private readonly plugin: Plugin) {}
+    constructor(
+        private readonly plugin: Plugin,
+        private readonly preferences: WorkbenchPreferences,
+    ) {}
 
     onload() {
-        if (isMobile()) {
+        this.enabled = this.preferences.isFeatureEnabledCached("documentFind");
+        this.mount();
+    }
+
+    onunload() {
+        this.unmount();
+    }
+
+    async isEnabled() {
+        return this.preferences.isFeatureEnabled("documentFind");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.preferences.setFeatureEnabled("documentFind", enabled);
+        this.enabled = enabled;
+        if (enabled) {
+            this.mount();
+        } else {
+            this.unmount();
+        }
+    }
+
+    private mount() {
+        if (!this.enabled || this.mounted || isMobile()) {
             return;
         }
+        this.mounted = true;
         document.addEventListener("keydown", this.globalKeydownHandler, true);
         this.plugin.eventBus.on("loaded-protyle-static", this.editorChangedHandler);
         this.plugin.eventBus.on("switch-protyle", this.editorChangedHandler);
         this.plugin.eventBus.on("destroy-protyle", this.destroyProtyleHandler);
     }
 
-    onunload() {
+    private unmount() {
+        if (!this.mounted) {
+            this.close();
+            return;
+        }
+        this.mounted = false;
         document.removeEventListener("keydown", this.globalKeydownHandler, true);
         this.plugin.eventBus.off("loaded-protyle-static", this.editorChangedHandler);
         this.plugin.eventBus.off("switch-protyle", this.editorChangedHandler);

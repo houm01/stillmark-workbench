@@ -5,6 +5,11 @@ import {
     getFrontend,
     showMessage,
 } from "siyuan";
+import {
+    addAppleSystemFontFaces,
+    type SystemFontFace,
+} from "./apple-system-fonts";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const SIYUAN_EDITOR_FONT_SELECTOR = ".b3-typography:not(.b3-typography--default), .protyle-wysiwyg, .protyle-title";
 const SIYUAN_EDITOR_FONT_RULE_PATTERN =
@@ -14,11 +19,7 @@ const DEFAULT_EDITOR_FONT_SIZE = 16;
 const MIN_EDITOR_FONT_SIZE = 9;
 const MAX_EDITOR_FONT_SIZE = 72;
 
-interface SystemFont {
-    family: string;
-    displayName: string;
-    weight: number;
-}
+type SystemFont = SystemFontFace;
 
 interface FontPreviewSession {
     committedFontSize: number;
@@ -33,14 +34,21 @@ interface FontMenuAnchor {
 }
 
 export class FontSwitcherFeature {
+    private enabled = true;
     private topBarElement?: HTMLElement;
 
-    constructor(private readonly plugin: Plugin) {}
+    constructor(
+        private readonly plugin: Plugin,
+        private readonly preferences: WorkbenchPreferences,
+    ) {}
 
     onload() {
-        this.plugin.addIcons(`<symbol id="iconStillmarkFont" viewBox="0 0 32 32">
-<path d="M8 25 15.5 7h1L24 25M10.5 19h11M6 7h21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-</symbol>`);
+        this.enabled = this.preferences.isFeatureEnabledCached("fontSwitcher");
+        this.plugin.addIcons(
+            `<symbol id="iconStillmarkFont" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 7V4h16v3M9 20h6M12 4v16"></path>
+</symbol>`,
+        );
     }
 
     onLayoutReady() {
@@ -53,9 +61,13 @@ export class FontSwitcherFeature {
             },
         });
         this.topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--font");
+        this.syncTopBarVisibility();
     }
 
     async open(anchor?: FontMenuAnchor) {
+        if (!this.enabled) {
+            return;
+        }
         try {
             const fonts = await this.loadSystemFonts();
             this.showFontMenu(fonts, anchor);
@@ -74,6 +86,20 @@ export class FontSwitcherFeature {
             this.plugin.i18n.fontSwitcherDefault;
     }
 
+    async isEnabled() {
+        return this.preferences.isFeatureEnabled("fontSwitcher");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.preferences.setFeatureEnabled("fontSwitcher", enabled);
+        this.enabled = enabled;
+        this.syncTopBarVisibility();
+    }
+
+    private syncTopBarVisibility() {
+        this.topBarElement?.classList.toggle("stillmark-feature-disabled", !this.enabled);
+    }
+
     private async loadSystemFonts() {
         const response = await fetchSyncPost("/api/system/getSysFonts", {});
         if (response.code !== 0) {
@@ -83,7 +109,7 @@ export class FontSwitcherFeature {
             throw new Error(this.plugin.i18n.fontSwitcherInvalidResponse);
         }
 
-        return response.data.flatMap((font): SystemFont[] => {
+        const fonts = response.data.flatMap((font): SystemFont[] => {
             if (!font || typeof font.family !== "string") {
                 return [];
             }
@@ -96,6 +122,7 @@ export class FontSwitcherFeature {
                 weight: Number.isFinite(font.weight) && font.weight > 0 ? font.weight : 400,
             }];
         });
+        return addAppleSystemFontFaces(fonts);
     }
 
     private showFontMenu(fonts: SystemFont[], anchor?: FontMenuAnchor) {

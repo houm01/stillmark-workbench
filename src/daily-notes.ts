@@ -11,6 +11,7 @@ import {
     DailyNotesSettings,
     Notebook,
 } from "./daily-notes-settings";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const DAILY_NOTE_ATTRIBUTE_PREFIX = "custom-dailynote-";
 const SHANGHAI_UTC_OFFSET = 8 * 60 * 60 * 1000;
@@ -42,6 +43,7 @@ class DailyNotesConfigurationError extends Error {}
 
 export class DailyNotesFeature {
     private readonly settings: DailyNotesSettings;
+    private enabled = true;
     private openTodayPromise: Promise<void> | null = null;
     private ensureTodayPromise: Promise<DailyNoteResult> | null = null;
     private topBarElement?: HTMLElement;
@@ -92,15 +94,20 @@ export class DailyNotesFeature {
         this.cancelLongPress();
     };
 
-    constructor(private readonly plugin: Plugin) {
+    constructor(
+        private readonly plugin: Plugin,
+        private readonly preferences: WorkbenchPreferences,
+    ) {
         this.settings = new DailyNotesSettings(plugin);
     }
 
     onload() {
-        this.plugin.addIcons(`<symbol id="iconStillmarkDailyNote" viewBox="0 0 32 32">
-<rect x="5" y="7" width="22" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"></rect>
-<path d="M10 4v6M22 4v6M5 13h22M10 18h5M10 22h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-</symbol>`);
+        this.enabled = this.preferences.isFeatureEnabledCached("dailyNotes");
+        this.plugin.addIcons(
+            `<symbol id="iconStillmarkDailyNote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 2v4M16 2v4M3 10h18"></path><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"></path>
+</symbol>`,
+        );
         this.settings.onload();
     }
 
@@ -119,6 +126,7 @@ export class DailyNotesFeature {
             },
         });
         this.topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--daily-note");
+        this.syncTopBarVisibility();
 
         if (isMobile) {
             this.topBarElement.addEventListener("contextmenu", this.touchContextMenuHandler);
@@ -130,7 +138,9 @@ export class DailyNotesFeature {
             this.topBarElement.addEventListener("contextmenu", this.contextMenuHandler);
         }
 
-        void this.createOnStartup();
+        if (this.enabled) {
+            void this.createOnStartup();
+        }
     }
 
     onunload() {
@@ -157,6 +167,16 @@ export class DailyNotesFeature {
         return this.settings.setAutoLocateInTreeOnOpen(enabled);
     }
 
+    async isEnabled() {
+        return this.preferences.isFeatureEnabled("dailyNotes");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.preferences.setFeatureEnabled("dailyNotes", enabled);
+        this.enabled = enabled;
+        this.syncTopBarVisibility();
+    }
+
     async getConfigurationStatus() {
         return (await this.settings.resolveNotebook()).status;
     }
@@ -170,6 +190,9 @@ export class DailyNotesFeature {
     }
 
     private openToday() {
+        if (!this.enabled) {
+            return Promise.resolve();
+        }
         if (this.openTodayPromise) {
             return this.openTodayPromise;
         }
@@ -245,6 +268,9 @@ export class DailyNotesFeature {
 
     private async createOnStartup() {
         try {
+            if (!this.enabled) {
+                return;
+            }
             if (!await this.settings.shouldAutoCreateOnStartup()) {
                 return;
             }
@@ -252,6 +278,10 @@ export class DailyNotesFeature {
         } catch (error) {
             showMessage(`${this.plugin.i18n.dailyNotesAutoCreateFailed}: ${errorMessage(error)}`, 6000, "error");
         }
+    }
+
+    private syncTopBarVisibility() {
+        this.topBarElement?.classList.toggle("stillmark-feature-disabled", !this.enabled);
     }
 
     private async showHistoryMenu() {

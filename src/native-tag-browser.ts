@@ -485,14 +485,19 @@ ORDER BY d.updated DESC`,
                 openMobileFileById(this.plugin.app, id, OPEN_DOCUMENT_ACTIONS);
                 return;
             }
-            await openTab({
+            const tab = await openTab({
                 app: this.plugin.app,
                 doc: {
                     action: OPEN_DOCUMENT_ACTIONS,
                     id,
                 },
+                keepCursor: openNewTab,
                 openNewTab,
             });
+            if (!openNewTab) {
+                tab.parent.switchTab(tab.headElement);
+                tab.parent.showHeading();
+            }
         } catch {
             showMessage(this.plugin.i18n.nativeTagOpenDocumentFailed, 5000, "error");
         }

@@ -9,10 +9,15 @@ import {
     showMessage,
 } from "siyuan";
 import {
+    addAppleSystemFontFamilies,
+    type SystemFontFamily,
+} from "./apple-system-fonts";
+import {
     addPdfOutline,
     type PdfOutlineHeading,
     setPdfTitle,
 } from "./pdf-outline";
+import {WorkbenchPreferences} from "./workbench-preferences";
 
 const PDF_EXPORT_STORAGE = "pdf-export.json";
 const PRINT_PAGE_STYLE_ID = "stillmark-pdf-page-style";
@@ -35,10 +40,7 @@ interface PdfExportSettings {
     keepFold: boolean;
 }
 
-interface SystemFont {
-    displayName: string;
-    family: string;
-}
+type SystemFont = SystemFontFamily;
 
 interface CurrentEditorFont {
     css: string;
@@ -105,20 +107,28 @@ const PAGE_MARGINS: Record<PdfMargin, string> = {
 export class PdfExportFeature {
     private activeDialog?: Dialog;
     private copiedPdfTempDirectory?: string;
+    private enabled = true;
     private settings: PdfExportSettings = {...DEFAULT_SETTINGS};
     private settingsReady: Promise<void> = Promise.resolve();
+    private topBarElement?: HTMLElement;
 
-    constructor(private readonly plugin: Plugin) {}
+    constructor(
+        private readonly plugin: Plugin,
+        private readonly preferences: WorkbenchPreferences,
+    ) {}
 
     onload() {
-        this.plugin.addIcons(`<symbol id="iconStillmarkPDF" viewBox="0 0 32 32">
-<path d="M8 4.5h11l5 5V27.5H8zM19 4.5v5h5M11.5 21v-7h2.3a2 2 0 0 1 0 4h-2.3M17.5 21v-7h1.7a3 3 0 0 1 0 6h-1.7M24 14h-3v7M21 17h2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-</symbol>`);
+        this.enabled = this.preferences.isFeatureEnabledCached("pdfExport");
+        this.plugin.addIcons(
+            `<symbol id="iconStillmarkPDF" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5zM14 2v6h6M12 12v6M9 15l3 3 3-3"></path>
+</symbol>`,
+        );
         this.settingsReady = this.loadSettings();
     }
 
     onLayoutReady() {
-        const topBarElement = this.plugin.addTopBar({
+        this.topBarElement = this.plugin.addTopBar({
             icon: "iconStillmarkPDF",
             title: this.plugin.i18n.pdfExportButtonTitle,
             position: "left",
@@ -126,7 +136,8 @@ export class PdfExportFeature {
                 void this.open();
             },
         });
-        topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--pdf");
+        this.topBarElement.classList.add("stillmark-topbar-icon", "stillmark-topbar-icon--pdf");
+        this.syncTopBarVisibility();
     }
 
     onunload() {
@@ -135,6 +146,9 @@ export class PdfExportFeature {
     }
 
     async open() {
+        if (!this.enabled) {
+            return;
+        }
         await this.settingsReady;
         const editor = getActiveEditor();
         const documentId = editor?.protyle?.block?.rootID;
@@ -187,6 +201,24 @@ export class PdfExportFeature {
 
     getStatusLabel() {
         return `${this.settings.pageSize} · ${this.presetLabel(this.settings.preset)}`;
+    }
+
+    async isEnabled() {
+        return this.preferences.isFeatureEnabled("pdfExport");
+    }
+
+    async setEnabled(enabled: boolean) {
+        await this.preferences.setFeatureEnabled("pdfExport", enabled);
+        this.enabled = enabled;
+        this.syncTopBarVisibility();
+        if (!enabled) {
+            this.activeDialog?.destroy();
+            this.cleanupPrintRoot();
+        }
+    }
+
+    private syncTopBarVisibility() {
+        this.topBarElement?.classList.toggle("stillmark-feature-disabled", !this.enabled);
     }
 
     private buildDialog(
@@ -713,15 +745,16 @@ export class PdfExportFeature {
             throw new Error(this.plugin.i18n.pdfExportFontLoadFailed);
         }
         const fonts = new Map<string, SystemFont>();
-        response.data.forEach((font) => {
+        const systemFonts = response.data.flatMap((font): SystemFont[] => {
             if (!font || typeof font.family !== "string" || !font.family) {
-                return;
+                return [];
             }
-            fonts.set(font.family, {
+            return [{
                 family: font.family,
                 displayName: typeof font.displayName === "string" && font.displayName ? font.displayName : font.family,
-            });
+            }];
         });
+        addAppleSystemFontFamilies(systemFonts).forEach((font) => fonts.set(font.family, font));
         return [...fonts.values()].sort((left, right) => left.displayName.localeCompare(right.displayName));
     }
 
