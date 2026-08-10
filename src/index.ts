@@ -16,6 +16,7 @@ import {InlineBacklinksFeature} from "./inline-backlinks";
 import {NativeTagBrowserFeature} from "./native-tag-browser";
 import {PdfExportFeature} from "./pdf-export";
 import {ReferenceAliasLabelFeature} from "./reference-alias-label";
+import {ThemeEnhancementsFeature} from "./theme-enhancements";
 import {WorkbenchDialogFeature} from "./workbench-dialog";
 import {WorkbenchPreferences} from "./workbench-preferences";
 import "./index.scss";
@@ -55,6 +56,7 @@ export default class StillmarkWorkbench extends Plugin {
     private nativeTagBrowser?: NativeTagBrowserFeature;
     private pdfExport?: PdfExportFeature;
     private referenceAliasLabel?: ReferenceAliasLabelFeature;
+    private themeEnhancements?: ThemeEnhancementsFeature;
     private workbench?: WorkbenchDialogFeature;
     private workbenchPreferences?: WorkbenchPreferences;
 
@@ -135,6 +137,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.referenceAliasLabel = new ReferenceAliasLabelFeature(this);
         this.referenceAliasLabel.onload();
 
+        this.themeEnhancements = new ThemeEnhancementsFeature();
+        this.themeEnhancements.onload();
+
         this.annotations = new AnnotationsFeature(this, this.workbenchPreferences);
         this.annotations.onload();
 
@@ -212,6 +217,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
         this.referenceAliasLabel?.onunload();
+        this.themeEnhancements?.onunload();
     }
 
     private async applyBlockRole(blockElements: HTMLElement[], role: BlockRole | null) {

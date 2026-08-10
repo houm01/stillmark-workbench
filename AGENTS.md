@@ -38,6 +38,7 @@
 * Keep PDF export typography compact and information-dense: modest paragraph and list spacing, readable reduced font size and line height, quiet code blocks, and no decorative rules under document or section headings. Tables should discard editor-fixed column widths, prefer single-line cells with density fallbacks, and repeat headers across pages; long code blocks may paginate instead of leaving large blank areas.
 * Keep document switches visually stable: reserve the breadcrumb's final height while its path loads, disable the native title-margin transition beside it, and do not call `expandDocTree` when the target document is already focused in the tree.
 * Database-backed document pages should present the native field panel as a quiet compact card and collapse it on each fresh document render, while preserving manual expand/collapse for the current editor instance.
+* Theme-owned JavaScript enhancements belong in this plugin: source-site favicons use direct no-referrer `/favicon.ico` requests with no third-party service, and duplicate bookmark labels use read-only file-tree API path lookup without changing document content.
 * When deploying runtime assets through `/api/file/putFile`, send the current Unix time in milliseconds as a nonzero `modTime` and confirm `readDir.updated` is current; `modTime=0` or seconds can leave installed files older than marketplace assets and allow stale CSS/JS to reappear.
 
 ## Verification

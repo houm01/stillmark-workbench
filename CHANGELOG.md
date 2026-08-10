@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.1 — 2026-08-10
+
+### Added
+
+* Enhance the Stillmark theme with direct source-site favicons and parent-path subtitles for duplicate bookmark titles without writing to document content.
+
 ## 0.4.0 — 2026-08-10
 
 ### Added
