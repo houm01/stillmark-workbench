@@ -648,7 +648,8 @@
   }
 
   &__row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
     align-items: center;
     min-width: 0;
     min-height: 30px;
@@ -662,6 +663,7 @@
   }
 
   &__toggle {
+    grid-column: 1;
     flex: 0 0 24px;
     width: 24px;
     height: 28px;
@@ -699,6 +701,7 @@
   }
 
   &__item {
+    grid-column: 2;
     appearance: none;
     display: flex;
     flex: 1 1 auto;
@@ -749,7 +752,7 @@
 
   &__children {
     position: relative;
-    padding-inline-start: 32px;
+    padding-inline-start: 16px;
 
     &::before {
       position: absolute;

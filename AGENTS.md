@@ -41,6 +41,7 @@
 * Theme-owned JavaScript enhancements belong in this plugin: source-site favicons use direct no-referrer `/favicon.ico` requests with no third-party service, and duplicate bookmark labels use read-only file-tree API path lookup without changing document content.
 * Content references may use a read-only batched target-type lookup and annotate only their current rendered nodes with `data-stillmark-ref-target="block|document"`; cache results, mark newly rendered references incrementally, and never change document content.
 * The current-document outline should follow editor clicks, caret movement, and scrolling: highlight the nearest heading, keep it visible in the outline, and reveal its collapsed ancestor path without expanding unrelated branches.
+* Every current-document outline row must reserve the same disclosure-control column whether or not the heading has children; nesting indentation is independent of disclosure availability, and the active background spans the full row.
 * When deploying runtime assets through `/api/file/putFile`, send the current Unix time in milliseconds as a nonzero `modTime` and confirm `readDir.updated` is current; `modTime=0` or seconds can leave installed files older than marketplace assets and allow stale CSS/JS to reappear.
 
 ## Verification
