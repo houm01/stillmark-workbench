@@ -4,9 +4,18 @@ This file records user-visible changes to Stillmark Workbench.
 
 ## Unreleased
 
+### Added
+
+* Add a persistent current-document outline with selectable right-dock and floating-editor modes, automatic heading refresh, and direct heading navigation.
+
 ### Changed
 
 * Move the note-path breadcrumb directly below SiYuan's native breadcrumb while keeping it independent from the native breadcrumb DOM.
+* Match the document outline to SiYuan's native order and hierarchy, add collapsible branches and editor-position tracking, use a denser opaque floating surface, and open the selected right dock when the layout is ready.
+
+### Fixed
+
+* Close workbench dialogs during plugin reloads so stale dialog handlers cannot block native shortcuts such as Command + P.
 
 ## 0.4.1 — 2026-08-10
 

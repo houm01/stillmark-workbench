@@ -11,6 +11,8 @@ interface StoredWorkbenchPreferences {
     dailyNotesEnabled?: boolean;
     documentBreadcrumbEnabled?: boolean;
     documentFindEnabled?: boolean;
+    documentOutlineEnabled?: boolean;
+    documentOutlineMode?: unknown;
     documentTreeFocusEnabled?: boolean;
     fontSwitcherEnabled?: boolean;
     inlineBacklinkDisplayNames?: Record<string, unknown>;
@@ -25,6 +27,8 @@ interface WorkbenchPreferencesState {
     dailyNotesEnabled: boolean;
     documentBreadcrumbEnabled: boolean;
     documentFindEnabled: boolean;
+    documentOutlineEnabled: boolean;
+    documentOutlineMode: DocumentOutlineMode;
     documentTreeFocusEnabled: boolean;
     fontSwitcherEnabled: boolean;
     inlineBacklinkDisplayNames: Record<string, string>;
@@ -39,6 +43,7 @@ type BooleanPreferenceKey =
     | "dailyNotesEnabled"
     | "documentBreadcrumbEnabled"
     | "documentFindEnabled"
+    | "documentOutlineEnabled"
     | "documentTreeFocusEnabled"
     | "fontSwitcherEnabled"
     | "inlineBacklinksEnabled"
@@ -50,6 +55,7 @@ export type WorkbenchFeature =
     | "dailyNotes"
     | "documentBreadcrumb"
     | "documentFind"
+    | "documentOutline"
     | "documentTreeFocus"
     | "fontSwitcher"
     | "inlineBacklinks"
@@ -61,6 +67,7 @@ const FEATURE_PREFERENCE_KEYS: Record<WorkbenchFeature, BooleanPreferenceKey> = 
     dailyNotes: "dailyNotesEnabled",
     documentBreadcrumb: "documentBreadcrumbEnabled",
     documentFind: "documentFindEnabled",
+    documentOutline: "documentOutlineEnabled",
     documentTreeFocus: "documentTreeFocusEnabled",
     fontSwitcher: "fontSwitcherEnabled",
     inlineBacklinks: "inlineBacklinksEnabled",
@@ -74,12 +81,16 @@ const DEFAULT_PREFERENCES: WorkbenchPreferencesState = {
     dailyNotesEnabled: true,
     documentBreadcrumbEnabled: true,
     documentFindEnabled: true,
+    documentOutlineEnabled: true,
+    documentOutlineMode: "dock",
     documentTreeFocusEnabled: true,
     fontSwitcherEnabled: true,
     inlineBacklinkDisplayNames: {},
     inlineBacklinksEnabled: true,
     pdfExportEnabled: true,
 };
+
+export type DocumentOutlineMode = "dock" | "floating";
 
 export class WorkbenchPreferences {
     private state = {...DEFAULT_PREFERENCES};
@@ -105,6 +116,37 @@ export class WorkbenchPreferences {
 
     async setFeatureEnabled(feature: WorkbenchFeature, enabled: boolean) {
         await this.setPreference(FEATURE_PREFERENCE_KEYS[feature], enabled);
+    }
+
+    getDocumentOutlineModeCached() {
+        return this.state.documentOutlineMode;
+    }
+
+    async getDocumentOutlineMode() {
+        await this.readyPromise;
+        return this.getDocumentOutlineModeCached();
+    }
+
+    async setDocumentOutlineMode(mode: DocumentOutlineMode) {
+        await this.readyPromise;
+        const operation = this.saveQueue.then(async () => {
+            const nextState: WorkbenchPreferencesState = {
+                ...this.state,
+                documentOutlineMode: mode,
+            };
+            const response = await this.plugin.saveData(STORAGE_NAME, nextState);
+            if (response.code !== 0) {
+                throw new Error(response.msg || this.plugin.i18n.workbenchPreferenceSaveFailed);
+            }
+
+            const readback = await this.plugin.loadData(STORAGE_NAME) as StoredWorkbenchPreferences | undefined;
+            if (readback?.documentOutlineMode !== mode) {
+                throw new Error(this.plugin.i18n.workbenchPreferenceVerificationFailed);
+            }
+            this.state = normalizePreferences(readback);
+        });
+        this.saveQueue = operation.catch(() => undefined);
+        await operation;
     }
 
     async isDocumentBreadcrumbEnabled() {
@@ -214,12 +256,18 @@ function normalizePreferences(stored?: StoredWorkbenchPreferences): WorkbenchPre
         dailyNotesEnabled: stored?.dailyNotesEnabled !== false,
         documentBreadcrumbEnabled: stored?.documentBreadcrumbEnabled !== false,
         documentFindEnabled: stored?.documentFindEnabled !== false,
+        documentOutlineEnabled: stored?.documentOutlineEnabled !== false,
+        documentOutlineMode: normalizeDocumentOutlineMode(stored?.documentOutlineMode),
         documentTreeFocusEnabled: stored?.documentTreeFocusEnabled !== false,
         fontSwitcherEnabled: stored?.fontSwitcherEnabled !== false,
         inlineBacklinkDisplayNames: normalizeDisplayNames(stored?.inlineBacklinkDisplayNames),
         inlineBacklinksEnabled: stored?.inlineBacklinksEnabled !== false,
         pdfExportEnabled: stored?.pdfExportEnabled !== false,
     };
+}
+
+function normalizeDocumentOutlineMode(mode: unknown): DocumentOutlineMode {
+    return mode === "floating" ? "floating" : "dock";
 }
 
 function normalizeDisplayNames(stored?: Record<string, unknown>) {
