@@ -17,6 +17,7 @@ interface StoredWorkbenchPreferences {
     fontSwitcherEnabled?: boolean;
     inlineBacklinkDisplayNames?: Record<string, unknown>;
     inlineBacklinksEnabled?: boolean;
+    mindMapEnabled?: boolean;
     pdfExportEnabled?: boolean;
 }
 
@@ -33,6 +34,7 @@ interface WorkbenchPreferencesState {
     fontSwitcherEnabled: boolean;
     inlineBacklinkDisplayNames: Record<string, string>;
     inlineBacklinksEnabled: boolean;
+    mindMapEnabled: boolean;
     pdfExportEnabled: boolean;
 }
 
@@ -47,6 +49,7 @@ type BooleanPreferenceKey =
     | "documentTreeFocusEnabled"
     | "fontSwitcherEnabled"
     | "inlineBacklinksEnabled"
+    | "mindMapEnabled"
     | "pdfExportEnabled";
 
 export type WorkbenchFeature =
@@ -59,6 +62,7 @@ export type WorkbenchFeature =
     | "documentTreeFocus"
     | "fontSwitcher"
     | "inlineBacklinks"
+    | "mindMap"
     | "pdfExport";
 
 const FEATURE_PREFERENCE_KEYS: Record<WorkbenchFeature, BooleanPreferenceKey> = {
@@ -71,6 +75,7 @@ const FEATURE_PREFERENCE_KEYS: Record<WorkbenchFeature, BooleanPreferenceKey> = 
     documentTreeFocus: "documentTreeFocusEnabled",
     fontSwitcher: "fontSwitcherEnabled",
     inlineBacklinks: "inlineBacklinksEnabled",
+    mindMap: "mindMapEnabled",
     pdfExport: "pdfExportEnabled",
 };
 
@@ -87,6 +92,7 @@ const DEFAULT_PREFERENCES: WorkbenchPreferencesState = {
     fontSwitcherEnabled: true,
     inlineBacklinkDisplayNames: {},
     inlineBacklinksEnabled: true,
+    mindMapEnabled: true,
     pdfExportEnabled: true,
 };
 
@@ -262,6 +268,7 @@ function normalizePreferences(stored?: StoredWorkbenchPreferences): WorkbenchPre
         fontSwitcherEnabled: stored?.fontSwitcherEnabled !== false,
         inlineBacklinkDisplayNames: normalizeDisplayNames(stored?.inlineBacklinkDisplayNames),
         inlineBacklinksEnabled: stored?.inlineBacklinksEnabled !== false,
+        mindMapEnabled: stored?.mindMapEnabled !== false,
         pdfExportEnabled: stored?.pdfExportEnabled !== false,
     };
 }

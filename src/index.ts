@@ -14,6 +14,7 @@ import {DocumentOutlineFeature} from "./document-outline";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
 import {InlineBacklinksFeature} from "./inline-backlinks";
+import {MindMapFeature} from "./mind-map";
 import {NativeTagBrowserFeature} from "./native-tag-browser";
 import {PdfExportFeature} from "./pdf-export";
 import {ReferenceAliasLabelFeature} from "./reference-alias-label";
@@ -55,6 +56,7 @@ export default class StillmarkWorkbench extends Plugin {
     private documentTreeFocus?: DocumentTreeFocusFeature;
     private fontSwitcher?: FontSwitcherFeature;
     private inlineBacklinks?: InlineBacklinksFeature;
+    private mindMap?: MindMapFeature;
     private nativeTagBrowser?: NativeTagBrowserFeature;
     private pdfExport?: PdfExportFeature;
     private referenceAliasLabel?: ReferenceAliasLabelFeature;
@@ -170,6 +172,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.inlineBacklinks = new InlineBacklinksFeature(this, this.workbenchPreferences);
         this.inlineBacklinks.onload();
 
+        this.mindMap = new MindMapFeature(this, this.workbenchPreferences);
+        this.mindMap.onload();
+
         this.nativeTagBrowser = new NativeTagBrowserFeature(this);
         this.nativeTagBrowser.onload();
 
@@ -185,6 +190,7 @@ export default class StillmarkWorkbench extends Plugin {
             this.documentBreadcrumb,
             this.documentTreeFocus,
             this.inlineBacklinks,
+            this.mindMap,
             this.fontSwitcher,
             this.pdfExport,
             this.workbenchPreferences,
@@ -211,6 +217,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.documentTreeFocus?.onLayoutReady();
         this.fontSwitcher?.onLayoutReady();
         this.inlineBacklinks?.onLayoutReady();
+        this.mindMap?.onLayoutReady();
         this.nativeTagBrowser?.onLayoutReady();
         this.pdfExport?.onLayoutReady();
     }
@@ -225,6 +232,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.documentOutline?.onunload();
         this.documentTreeFocus?.onunload();
         this.inlineBacklinks?.onunload();
+        this.mindMap?.onunload();
         this.nativeTagBrowser?.onunload();
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();

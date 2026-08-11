@@ -12,6 +12,7 @@ import {DocumentOutlineFeature} from "./document-outline";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
 import {InlineBacklinksFeature} from "./inline-backlinks";
+import {MindMapFeature} from "./mind-map";
 import {PdfExportFeature} from "./pdf-export";
 import {
     WorkbenchFeature,
@@ -78,6 +79,7 @@ export class WorkbenchDialogFeature {
         private readonly documentBreadcrumb: DocumentBreadcrumbFeature,
         private readonly documentTreeFocus: DocumentTreeFocusFeature,
         private readonly inlineBacklinks: InlineBacklinksFeature,
+        private readonly mindMap: MindMapFeature,
         private readonly fontSwitcher: FontSwitcherFeature,
         private readonly pdfExport: PdfExportFeature,
         private readonly preferences: WorkbenchPreferences,
@@ -95,6 +97,7 @@ export class WorkbenchDialogFeature {
             annotationsEnabled,
             documentBreadcrumbEnabled,
             inlineBacklinksEnabled,
+            mindMapEnabled,
             fontSwitcherEnabled,
             pdfExportEnabled,
             blockRolesEnabled,
@@ -109,6 +112,7 @@ export class WorkbenchDialogFeature {
             this.annotations.isEnabled(),
             this.documentBreadcrumb.isEnabled(),
             this.inlineBacklinks.isEnabled(),
+            this.mindMap.isEnabled(),
             this.fontSwitcher.isEnabled(),
             this.pdfExport.isEnabled(),
             this.preferences.isFeatureEnabled("blockRoles"),
@@ -203,6 +207,30 @@ export class WorkbenchDialogFeature {
             title: this.plugin.i18n.documentFindTool,
             description: this.plugin.i18n.documentFindToolDescription,
             controls: [documentFindToggle],
+        }));
+
+        const mindMapButton = this.createButton(
+            this.mindMap.isOpenForActiveDocument() ?
+                this.plugin.i18n.mindMapReturnToDocument :
+                this.plugin.i18n.mindMapOpen,
+            () => {
+                dialog.destroy();
+                void this.mindMap.toggle();
+            },
+        );
+        mindMapButton.disabled = !mindMapEnabled;
+        const mindMapToggle = this.createFeatureToggle(
+            "mindMap",
+            this.plugin.i18n.mindMapTool,
+            mindMapEnabled,
+            (enabled) => this.mindMap.setEnabled(enabled),
+            [mindMapButton],
+            featureToggles,
+        );
+        root.append(this.createTool({
+            title: this.plugin.i18n.mindMapTool,
+            description: this.plugin.i18n.mindMapToolDescription,
+            controls: [mindMapToggle, mindMapButton],
         }));
 
         const documentOutlineModeControl = this.createDocumentOutlineModeControl(documentOutlineMode);
