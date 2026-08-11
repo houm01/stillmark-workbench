@@ -12,7 +12,7 @@
 
 ## Git
 
-* Do not modify `main` directly. Work on `feature/*` branches and merge through a pull request.
+* Do not modify `main` directly. Use `dev` as the only development branch and merge `dev` into `main` through a pull request; do not create other development branches.
 * Do not create worktrees.
 
 ## SiYuan data safety
