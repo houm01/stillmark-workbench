@@ -42,7 +42,7 @@ SiYuan's native `Command + P` global search is unchanged. The plugin does not in
 
 The document outline lists H1-H6 headings in document order and hierarchy, supports collapsible branches, and moves to a heading when clicked. Clicking or moving the caret in the editor, or scrolling into another section, highlights the matching heading and keeps it visible in the outline. The outline can use SiYuan's right dock or appear as a compact floating panel in the current editor; both the feature switch and display mode are persisted from the workbench.
 
-Right-dock mode reuses SiYuan's native dock area. Floating mode overlays only the active editor without changing the document width or global appearance. The outline refreshes after document switches and heading updates without rebuilding an unchanged tree. Active highlighting spans the full row, leaf headings do not reserve an empty disclosure gutter, and child headings remain indented beyond their parent.
+Right-dock mode reuses SiYuan's native dock area. Floating mode overlays only the active editor without changing the document width or global appearance. The outline refreshes after document switches and heading updates without rebuilding an unchanged tree. Active highlighting spans the full row, every heading reserves the same compact disclosure column so headings at the same depth align whether or not they have children, and each nested level adds consistent indentation.
 
 ### Note path
 

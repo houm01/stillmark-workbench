@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.3 — 2026-08-11
+
+### Fixed
+
+* Align document-outline headings at the same depth whether or not they have children, while retaining consistent nested indentation and full-row active highlighting.
+
 ## 0.4.2 — 2026-08-11
 
 ### Added
