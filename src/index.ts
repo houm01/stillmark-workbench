@@ -10,6 +10,7 @@ import {DailyNotesFeature} from "./daily-notes";
 import {DatabasePageFeature} from "./database-page";
 import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {DocumentFindFeature} from "./document-find";
+import {DocumentOutlineFeature} from "./document-outline";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
 import {InlineBacklinksFeature} from "./inline-backlinks";
@@ -50,6 +51,7 @@ export default class StillmarkWorkbench extends Plugin {
     private databasePage?: DatabasePageFeature;
     private documentBreadcrumb?: DocumentBreadcrumbFeature;
     private documentFind?: DocumentFindFeature;
+    private documentOutline?: DocumentOutlineFeature;
     private documentTreeFocus?: DocumentTreeFocusFeature;
     private fontSwitcher?: FontSwitcherFeature;
     private inlineBacklinks?: InlineBacklinksFeature;
@@ -115,6 +117,9 @@ export default class StillmarkWorkbench extends Plugin {
 </symbol>
 <symbol id="iconStillmarkAnnotation" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
 <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zM8 9h8M8 13h5"></path>
+</symbol>
+<symbol id="iconStillmarkOutline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M4 6h2M4 12h2M4 18h2M10 6h10M10 12h7M10 18h10"></path>
 </symbol>`,
         );
 
@@ -149,6 +154,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.documentFind = new DocumentFindFeature(this, this.workbenchPreferences);
         this.documentFind.onload();
 
+        this.documentOutline = new DocumentOutlineFeature(this, this.workbenchPreferences);
+        this.documentOutline.onload();
+
         this.documentTreeFocus = new DocumentTreeFocusFeature(
             this,
             this.dailyNotes,
@@ -173,6 +181,7 @@ export default class StillmarkWorkbench extends Plugin {
             this.annotations,
             this.dailyNotes,
             this.documentFind,
+            this.documentOutline,
             this.documentBreadcrumb,
             this.documentTreeFocus,
             this.inlineBacklinks,
@@ -198,6 +207,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.annotations?.onLayoutReady();
         this.databasePage?.onLayoutReady();
         this.documentBreadcrumb?.onLayoutReady();
+        this.documentOutline?.onLayoutReady();
         this.documentTreeFocus?.onLayoutReady();
         this.fontSwitcher?.onLayoutReady();
         this.inlineBacklinks?.onLayoutReady();
@@ -207,10 +217,12 @@ export default class StillmarkWorkbench extends Plugin {
 
     onunload() {
         this.eventBus.off("click-blockicon", this.blockMenuHandler);
+        this.workbench?.onunload();
         this.annotations?.onunload();
         this.databasePage?.onunload();
         this.documentBreadcrumb?.onunload();
         this.documentFind?.onunload();
+        this.documentOutline?.onunload();
         this.documentTreeFocus?.onunload();
         this.inlineBacklinks?.onunload();
         this.nativeTagBrowser?.onunload();

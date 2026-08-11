@@ -16,7 +16,7 @@
 
 ## Available tools
 
-The upper-right Stillmark Workbench shows every tool and its current status, with direct entry points for daily notes, document-tree location, fonts, and PDF export. Automatic document-tree location, note-path breadcrumbs, and Linked pages can also be toggled there. Settings opened from the workbench provide a direct return action and reopen the workbench after a successful save.
+The upper-right Stillmark Workbench shows every tool and its current status, with direct entry points for daily notes, document-tree location, fonts, and PDF export. Automatic document-tree location, the document outline, note-path breadcrumbs, and Linked pages can also be toggled there. Settings opened from the workbench provide a direct return action and reopen the workbench after a successful save.
 
 ### Tagged documents
 
@@ -35,6 +35,12 @@ These enhancements change only runtime presentation. They do not add elements, c
 Press `Command + F` in the document editor (`Ctrl + F` on Windows/Linux) to open a compact find bar in the editor's upper-right corner. The plugin searches only the current document, highlights matches in document order, and supports `Enter` for next, `Shift + Enter` for previous, and `Esc` to close.
 
 SiYuan's native `Command + P` global search is unchanged. The plugin does not intercept `Command + F` in the workbench, settings, PDFs, or other non-document areas.
+
+### Document outline
+
+The document outline lists H1-H6 headings in document order and hierarchy, supports collapsible branches, and moves to a heading when clicked. Clicking or moving the caret in the editor, or scrolling into another section, highlights the matching heading and keeps it visible in the outline. The outline can use SiYuan's right dock or appear as a compact floating panel in the current editor; both the feature switch and display mode are persisted from the workbench.
+
+Right-dock mode reuses SiYuan's native dock area. Floating mode overlays only the active editor without changing the document width or global appearance. The outline refreshes after document switches and heading updates.
 
 ### Note path
 
@@ -112,6 +118,7 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 * The tag panel reads tags and related documents only through SiYuan's tag and SQL query APIs; expansion, filtering, and navigation do not modify tags or document content.
 * Find in document reads only the current document through SiYuan's search API and never changes block content.
 * Stillmark theme enhancements read bookmark paths through SiYuan's file-tree APIs and never change bookmarks or document content.
+* Document outline reads current-document headings only through SiYuan's native outline API and never changes documents or workspace files.
 * Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
 * Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.
 * Daily notes are written only to the explicitly configured, currently open notebook.

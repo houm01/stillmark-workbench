@@ -13,6 +13,7 @@
   ],
   "excludes": [
     "**/.git",
+    "**/.playwright-cli",
     "**/node_modules",
     "**/dist",
     "**/pnpm-lock.yaml",

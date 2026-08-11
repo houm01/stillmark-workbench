@@ -8,6 +8,7 @@ import {AnnotationsFeature} from "./annotations";
 import {DailyNotesFeature} from "./daily-notes";
 import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {DocumentFindFeature} from "./document-find";
+import {DocumentOutlineFeature} from "./document-outline";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
 import {InlineBacklinksFeature} from "./inline-backlinks";
@@ -64,6 +65,8 @@ const ROLE_DEFINITIONS = [
 ];
 
 export class WorkbenchDialogFeature {
+    private dialog?: Dialog;
+    private disposed = false;
     private readonly toggleUpdaters = new WeakMap<HTMLElement, ToggleUpdater>();
 
     constructor(
@@ -71,6 +74,7 @@ export class WorkbenchDialogFeature {
         private readonly annotations: AnnotationsFeature,
         private readonly dailyNotes: DailyNotesFeature,
         private readonly documentFind: DocumentFindFeature,
+        private readonly documentOutline: DocumentOutlineFeature,
         private readonly documentBreadcrumb: DocumentBreadcrumbFeature,
         private readonly documentTreeFocus: DocumentTreeFocusFeature,
         private readonly inlineBacklinks: InlineBacklinksFeature,
@@ -86,6 +90,8 @@ export class WorkbenchDialogFeature {
             dailyNotesEnabled,
             documentTreeFocusEnabled,
             documentFindEnabled,
+            documentOutlineEnabled,
+            documentOutlineMode,
             annotationsEnabled,
             documentBreadcrumbEnabled,
             inlineBacklinksEnabled,
@@ -98,6 +104,8 @@ export class WorkbenchDialogFeature {
             this.dailyNotes.isEnabled(),
             this.documentTreeFocus.isEnabled(),
             this.documentFind.isEnabled(),
+            this.documentOutline.isEnabled(),
+            this.documentOutline.getMode(),
             this.annotations.isEnabled(),
             this.documentBreadcrumb.isEnabled(),
             this.inlineBacklinks.isEnabled(),
@@ -105,15 +113,27 @@ export class WorkbenchDialogFeature {
             this.pdfExport.isEnabled(),
             this.preferences.isFeatureEnabled("blockRoles"),
         ]);
+        if (this.disposed) {
+            return;
+        }
+
+        this.dialog?.destroy();
         const isMobile = ["mobile", "browser-mobile"].includes(getFrontend());
         const dialog = new Dialog({
             title: this.plugin.i18n.workbenchTitle,
             content: '<div class="b3-dialog__content stillmark-workbench"></div>',
             width: isMobile ? "calc(100vw - 16px)" : "min(680px, calc(100vw - 24px))",
+            destroyCallback: () => {
+                if (this.dialog === dialog) {
+                    this.dialog = undefined;
+                }
+            },
         });
+        this.dialog = dialog;
         dialog.element.classList.add("stillmark-workbench-dialog");
         const root = dialog.element.querySelector<HTMLElement>(".stillmark-workbench");
         if (!root) {
+            dialog.destroy();
             return;
         }
         const featureToggles: FeatureToggleHandle[] = [];
@@ -183,6 +203,21 @@ export class WorkbenchDialogFeature {
             title: this.plugin.i18n.documentFindTool,
             description: this.plugin.i18n.documentFindToolDescription,
             controls: [documentFindToggle],
+        }));
+
+        const documentOutlineModeControl = this.createDocumentOutlineModeControl(documentOutlineMode);
+        const documentOutlineToggle = this.createFeatureToggle(
+            "documentOutline",
+            this.plugin.i18n.documentOutlineTool,
+            documentOutlineEnabled,
+            (enabled) => this.documentOutline.setEnabled(enabled),
+            [documentOutlineModeControl],
+            featureToggles,
+        );
+        root.append(this.createTool({
+            title: this.plugin.i18n.documentOutlineTool,
+            description: this.plugin.i18n.documentOutlineToolDescription,
+            controls: [documentOutlineModeControl, documentOutlineToggle],
         }));
 
         const annotationButton = this.createButton(this.plugin.i18n.annotationCreate, () => {
@@ -291,6 +326,12 @@ export class WorkbenchDialogFeature {
         root.prepend(this.createBulkActions(featureToggles));
     }
 
+    onunload() {
+        this.disposed = true;
+        this.dialog?.destroy();
+        this.dialog = undefined;
+    }
+
     private createTool(options: ToolOptions) {
         const section = document.createElement("section");
         section.className = "stillmark-workbench__tool";
@@ -343,6 +384,54 @@ export class WorkbenchDialogFeature {
         button.textContent = label;
         button.addEventListener("click", callback);
         return button;
+    }
+
+    private createDocumentOutlineModeControl(mode: ReturnType<DocumentOutlineFeature["getModeCached"]>) {
+        const label = document.createElement("label");
+        label.className = "stillmark-workbench__select-control";
+        const text = document.createElement("span");
+        text.textContent = this.plugin.i18n.documentOutlineModeLabel;
+        const select = document.createElement("select");
+        select.className = "b3-select";
+        select.setAttribute("aria-label", this.plugin.i18n.documentOutlineModeLabel);
+        [
+            {label: this.plugin.i18n.documentOutlineModeDock, value: "dock"},
+            {label: this.plugin.i18n.documentOutlineModeFloating, value: "floating"},
+        ].forEach((optionDefinition) => {
+            const option = document.createElement("option");
+            option.textContent = optionDefinition.label;
+            option.value = optionDefinition.value;
+            select.append(option);
+        });
+        select.value = mode;
+        let savedMode = mode;
+        select.addEventListener("change", () => {
+            const requestedMode = select.value === "floating" ? "floating" : "dock";
+            select.disabled = true;
+            void this.documentOutline.setMode(requestedMode).then(() => {
+                savedMode = requestedMode;
+                showMessage(
+                    this.plugin.i18n.documentOutlineModeChanged.replace(
+                        "${mode}",
+                        requestedMode === "floating" ?
+                            this.plugin.i18n.documentOutlineModeFloating :
+                            this.plugin.i18n.documentOutlineModeDock,
+                    ),
+                    3000,
+                );
+            }).catch((error) => {
+                select.value = savedMode;
+                showMessage(
+                    `${this.plugin.i18n.documentOutlineModeSaveFailed}: ${errorMessage(error)}`,
+                    5000,
+                    "error",
+                );
+            }).finally(() => {
+                select.disabled = false;
+            });
+        });
+        label.append(text, select);
+        return label;
     }
 
     private createFeatureToggle(
@@ -497,12 +586,16 @@ export class WorkbenchDialogFeature {
         controls.forEach((control) => {
             control.classList.toggle("stillmark-workbench__control--disabled", disabled);
             control.setAttribute("aria-disabled", String(disabled));
-            if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+            if (
+                control instanceof HTMLButtonElement ||
+                control instanceof HTMLInputElement ||
+                control instanceof HTMLSelectElement
+            ) {
                 control.disabled = disabled;
             }
-            control.querySelectorAll<HTMLInputElement | HTMLButtonElement>("input, button").forEach((input) => {
-                input.disabled = disabled;
-            });
+            control.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
+                "input, button, select",
+            ).forEach((input) => input.disabled = disabled);
         });
     }
 
