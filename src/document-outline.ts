@@ -26,6 +26,7 @@ const OPEN_HEADING_ACTIONS: TProtyleAction[] = [
 
 interface OutlineApiNode {
     blocks?: unknown;
+    children?: unknown;
     content?: unknown;
     id?: unknown;
     name?: unknown;
@@ -55,6 +56,7 @@ export class DocumentOutlineFeature {
     private floatingHost?: HTMLElement;
     private floatingRoot?: HTMLElement;
     private headings: OutlineHeading[] = [];
+    private headingsRootId = "";
     private mode: DocumentOutlineMode = "dock";
     private mounted = false;
     private refreshGeneration = 0;
@@ -223,6 +225,7 @@ export class DocumentOutlineFeature {
         window.cancelAnimationFrame(this.editorScrollFrame);
         this.refreshGeneration += 1;
         this.headings = [];
+        this.headingsRootId = "";
         this.activeHeadingId = "";
         this.destroyFloatingPanel();
         this.renderPanels();
@@ -354,13 +357,20 @@ export class DocumentOutlineFeature {
         this.activeRootId = rootId;
         const generation = ++this.refreshGeneration;
         if (!BLOCK_ID_PATTERN.test(rootId)) {
+            const needsRender = Boolean(this.headingsRootId || this.headings.length || this.activeHeadingId);
             this.headings = [];
+            this.headingsRootId = "";
             this.activeHeadingId = "";
-            this.renderPanels();
+            if (needsRender) {
+                this.renderPanels();
+            }
             return;
         }
 
-        this.setPanelState(this.plugin.i18n.documentOutlineLoading, "loading");
+        const hasCurrentOutline = this.headingsRootId === rootId;
+        if (!hasCurrentOutline) {
+            this.setPanelState(this.plugin.i18n.documentOutlineLoading, "loading");
+        }
         try {
             const response = await fetchSyncPost("/api/outline/getDocOutline", {id: rootId});
             if (response.code !== 0 || !Array.isArray(response.data)) {
@@ -372,7 +382,11 @@ export class DocumentOutlineFeature {
             }
             const editorElement = editor?.protyle.wysiwyg?.element ??
                 this.activeEditorHost?.querySelector<HTMLElement>(".protyle-wysiwyg");
-            this.headings = normalizeHeadingTree(response.data, editorElement);
+            const headings = normalizeHeadingTree(response.data, editorElement);
+            const sameStructure = hasCurrentOutline && headingStructuresEqual(this.headings, headings);
+            const sameContent = hasCurrentOutline && headingTreesEqual(this.headings, headings);
+            this.headings = headings;
+            this.headingsRootId = rootId;
             [...this.collapsedHeadingIds].forEach((id) => {
                 if (!hasHeading(this.headings, id)) {
                     this.collapsedHeadingIds.delete(id);
@@ -381,15 +395,24 @@ export class DocumentOutlineFeature {
             if (!hasHeading(this.headings, this.activeHeadingId)) {
                 this.activeHeadingId = "";
             }
-            this.renderPanels();
+            if (!sameContent) {
+                if (sameStructure) {
+                    this.updatePanelHeadingContent();
+                } else {
+                    this.renderPanels();
+                }
+            }
             this.syncActiveHeadingFromViewport();
         } catch {
             if (generation !== this.refreshGeneration) {
                 return;
             }
-            this.headings = [];
-            this.activeHeadingId = "";
-            this.setPanelState(this.plugin.i18n.documentOutlineLoadFailed, "error");
+            if (!hasCurrentOutline) {
+                this.headings = [];
+                this.headingsRootId = rootId;
+                this.activeHeadingId = "";
+                this.setPanelState(this.plugin.i18n.documentOutlineLoadFailed, "error");
+            }
         }
     }
 
@@ -419,11 +442,48 @@ export class DocumentOutlineFeature {
             this.plugin.i18n.documentOutlineNoDocument;
     }
 
+    private updatePanelHeadingContent() {
+        const headings = flattenHeadings(this.headings);
+        [this.dockRoot, this.floatingRoot].forEach((root) => {
+            if (!root) {
+                return;
+            }
+            for (const heading of headings) {
+                const item = root.querySelector<HTMLElement>(
+                    `.stillmark-document-outline__item[data-node-id="${CSS.escape(heading.id)}"]`,
+                );
+                const marker = item?.querySelector<HTMLElement>(".stillmark-document-outline__marker");
+                const title = item?.querySelector<HTMLElement>(".stillmark-document-outline__title");
+                if (!item || !marker || !title) {
+                    this.renderPanel(root);
+                    return;
+                }
+                item.title = heading.title;
+                item.setAttribute("aria-label", `${heading.title} · H${heading.level}`);
+                marker.textContent = formatHeadingLevel(heading.level);
+                title.textContent = heading.title;
+
+                const toggle = item.parentElement?.querySelector<HTMLElement>(
+                    ":scope > .stillmark-document-outline__toggle",
+                );
+                if (toggle) {
+                    toggle.setAttribute(
+                        "aria-label",
+                        (this.collapsedHeadingIds.has(heading.id) ?
+                            this.plugin.i18n.documentOutlineExpandHeading :
+                            this.plugin.i18n.documentOutlineCollapseHeading).replace("${title}", heading.title),
+                    );
+                }
+            }
+        });
+    }
+
     private createHeadingBranch(heading: OutlineHeading) {
         const branch = document.createElement("div");
         branch.className = "stillmark-document-outline__branch";
         const row = document.createElement("div");
         row.className = "stillmark-document-outline__row";
+        row.classList.toggle("is-active", heading.id === this.activeHeadingId);
 
         if (heading.children.length > 0) {
             const collapsed = this.collapsedHeadingIds.has(heading.id);
@@ -448,11 +508,6 @@ export class DocumentOutlineFeature {
                 this.scrollActiveHeadingIntoView();
             });
             row.append(toggle);
-        } else {
-            const spacer = document.createElement("span");
-            spacer.className = "stillmark-document-outline__toggle-spacer";
-            spacer.setAttribute("aria-hidden", "true");
-            row.append(spacer);
         }
         row.append(this.createHeadingButton(heading));
         branch.append(row);
@@ -580,6 +635,7 @@ export class DocumentOutlineFeature {
             root?.querySelectorAll<HTMLElement>(".stillmark-document-outline__item").forEach((item) => {
                 const active = item.dataset.nodeId === this.activeHeadingId;
                 item.classList.toggle("is-active", active);
+                item.parentElement?.classList.toggle("is-active", active);
                 item.setAttribute("aria-current", active ? "location" : "false");
             });
         });
@@ -656,7 +712,8 @@ function normalizeHeadingTree(nodes: unknown, editor?: HTMLElement): OutlineHead
     }
     return nodes.flatMap((value: unknown) => {
         const node = value && typeof value === "object" ? value as OutlineApiNode : {};
-        const children = normalizeHeadingTree(node.blocks, editor);
+        const nestedNodes = Array.isArray(node.blocks) && node.blocks.length > 0 ? node.blocks : node.children;
+        const children = normalizeHeadingTree(nestedNodes, editor);
         const id = typeof node.id === "string" ? node.id : "";
         const level = typeof node.subType === "string" ? Number(node.subType.slice(1)) : 0;
         if (!BLOCK_ID_PATTERN.test(id) || !Number.isInteger(level) || level < 1 || level > 6) {
@@ -677,6 +734,26 @@ function normalizeText(value: unknown) {
 
 function countHeadings(headings: OutlineHeading[]): number {
     return headings.reduce((count, heading) => count + 1 + countHeadings(heading.children), 0);
+}
+
+function flattenHeadings(headings: OutlineHeading[]): OutlineHeading[] {
+    return headings.flatMap((heading) => [heading, ...flattenHeadings(heading.children)]);
+}
+
+function headingStructuresEqual(current: OutlineHeading[], next: OutlineHeading[]): boolean {
+    return current.length === next.length && current.every((heading, index) => {
+        const nextHeading = next[index];
+        return heading.id === nextHeading.id && headingStructuresEqual(heading.children, nextHeading.children);
+    });
+}
+
+function headingTreesEqual(current: OutlineHeading[], next: OutlineHeading[]): boolean {
+    return current.length === next.length && current.every((heading, index) => {
+        const nextHeading = next[index];
+        return heading.id === nextHeading.id && heading.level === nextHeading.level &&
+            heading.title === nextHeading.title &&
+            headingTreesEqual(heading.children, nextHeading.children);
+    });
 }
 
 function hasHeading(headings: OutlineHeading[], id: string): boolean {

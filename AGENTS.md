@@ -39,6 +39,7 @@
 * Keep document switches visually stable: reserve the breadcrumb's final height while its path loads, disable the native title-margin transition beside it, and do not call `expandDocTree` when the target document is already focused in the tree.
 * Database-backed document pages should present the native field panel as a quiet compact card and collapse it on each fresh document render, while preserving manual expand/collapse for the current editor instance.
 * Theme-owned JavaScript enhancements belong in this plugin: source-site favicons use direct no-referrer `/favicon.ico` requests with no third-party service, and duplicate bookmark labels use read-only file-tree API path lookup without changing document content.
+* Content references may use a read-only batched target-type lookup and annotate only their current rendered nodes with `data-stillmark-ref-target="block|document"`; cache results, mark newly rendered references incrementally, and never change document content.
 * The current-document outline should follow editor clicks, caret movement, and scrolling: highlight the nearest heading, keep it visible in the outline, and reveal its collapsed ancestor path without expanding unrelated branches.
 * When deploying runtime assets through `/api/file/putFile`, send the current Unix time in milliseconds as a nonzero `modTime` and confirm `readDir.updated` is current; `modTime=0` or seconds can leave installed files older than marketplace assets and allow stale CSS/JS to reappear.
 
@@ -47,5 +48,6 @@
 * Run `pnpm check` and `git diff --check` before publishing changes.
 * Verify data mutations against a disposable test block before a release.
 * For local runtime verification, back up the served plugin assets, upload the built `dist/` assets through `/api/file/putFile`, and reload with `/api/petal/setPetalEnabled`; verify the served bytes and enabled state after reload. Do not copy files directly into the workspace.
+* Verify content-reference target annotations in a real document containing both heading/block and whole-document targets; confirm the attributes return after a rerender and produce distinct light/dark theme styles.
 * For document-switch jump regressions, sample the title position, breadcrumb loading state, and following tree-item position across animation frames; a settled screenshot alone can miss the transient shift.
 * Verify PDF code-block spacing in the actual export dialog after `ProtyleMethod.highlightRender`; raw export HTML does not include the renderer's later theme padding and inline whitespace styles.

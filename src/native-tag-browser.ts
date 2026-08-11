@@ -56,6 +56,7 @@ interface TagPanelState {
     nativeObserver: MutationObserver;
     panel: HTMLElement;
     panelClickHandler: (event: MouseEvent) => void;
+    documentsInvalidated: boolean;
     refreshGeneration: number;
     refreshTimer?: number;
     requestSequence: number;
@@ -72,7 +73,7 @@ export class NativeTagBrowserFeature {
         if (!OPEN_DOCUMENT_COMMANDS.has(detail?.cmd)) {
             return;
         }
-        this.panels.forEach((state) => this.scheduleRefresh(state, true));
+        this.panels.forEach((state) => this.scheduleRefresh(state, detail.cmd !== "transactions"));
     };
 
     constructor(private readonly plugin: Plugin) {}
@@ -100,8 +101,15 @@ export class NativeTagBrowserFeature {
 
     private ensurePanels() {
         [...this.panels.values()].forEach((state) => {
-            if (!document.contains(state.panel) || !state.panel.contains(state.nativeHost)) {
+            if (!document.contains(state.panel)) {
                 this.unmountPanel(state);
+                return;
+            }
+            if (!state.panel.contains(state.nativeHost)) {
+                const nativeHost = this.findNativeHost(state.panel);
+                if (nativeHost) {
+                    this.rebindNativeHost(state, nativeHost);
+                }
             }
         });
 
@@ -109,10 +117,8 @@ export class NativeTagBrowserFeature {
             if (this.panels.has(panel)) {
                 return;
             }
-            const nativeHost = [...panel.children].find((child) =>
-                child instanceof HTMLElement && child.classList.contains("fn__flex-1")
-            );
-            if (nativeHost instanceof HTMLElement) {
+            const nativeHost = this.findNativeHost(panel);
+            if (nativeHost) {
                 this.mountPanel(panel, nativeHost);
             }
         });
@@ -122,6 +128,14 @@ export class NativeTagBrowserFeature {
         if (record.target instanceof Element) {
             const targetPanel = record.target.closest<HTMLElement>(PANEL_SELECTOR);
             if (targetPanel && !this.panels.has(targetPanel)) {
+                return true;
+            }
+            if (
+                targetPanel === record.target &&
+                [...record.addedNodes].some((node) =>
+                    node instanceof HTMLElement && node.classList.contains("fn__flex-1")
+                )
+            ) {
                 return true;
             }
         }
@@ -137,6 +151,23 @@ export class NativeTagBrowserFeature {
                 node === state.nativeHost || node.contains(state.nativeHost)
             );
         });
+    }
+
+    private findNativeHost(panel: HTMLElement) {
+        return [...panel.children].find((child): child is HTMLElement =>
+            child instanceof HTMLElement && child.classList.contains("fn__flex-1")
+        );
+    }
+
+    private rebindNativeHost(state: TagPanelState, nativeHost: HTMLElement) {
+        state.nativeObserver.disconnect();
+        state.nativeHost.classList.remove("stillmark-native-tags__native-host");
+        state.nativeHost = nativeHost;
+        if (!state.root.hidden) {
+            state.nativeHost.classList.add("stillmark-native-tags__native-host");
+        }
+        state.nativeObserver.observe(nativeHost, {childList: true, subtree: true});
+        this.scheduleRefresh(state, false);
     }
 
     private mountPanel(panel: HTMLElement, nativeHost: HTMLElement) {
@@ -166,6 +197,7 @@ export class NativeTagBrowserFeature {
             documentErrors: new Set(),
             documentRequests: new Map(),
             documents: new Map(),
+            documentsInvalidated: false,
             expandedTags: new Set(),
             filter,
             nativeHost,
@@ -185,7 +217,7 @@ export class NativeTagBrowserFeature {
         panel.addEventListener("click", state.panelClickHandler);
         state.nativeObserver.observe(nativeHost, {childList: true, subtree: true});
         this.panels.set(panel, state);
-        void this.refreshPanel(state, false);
+        void this.refreshPanel(state);
     }
 
     private unmountPanel(state: TagPanelState) {
@@ -207,20 +239,16 @@ export class NativeTagBrowserFeature {
             state.documents.clear();
             state.documentErrors.clear();
             state.documentRequests.clear();
+            state.documentsInvalidated = true;
         }
         window.clearTimeout(state.refreshTimer);
         state.refreshTimer = window.setTimeout(() => {
             state.refreshTimer = undefined;
-            void this.refreshPanel(state, false);
+            void this.refreshPanel(state);
         }, PANEL_REFRESH_DELAY_MS);
     }
 
-    private async refreshPanel(state: TagPanelState, clearDocuments: boolean) {
-        if (clearDocuments) {
-            state.documents.clear();
-            state.documentErrors.clear();
-            state.documentRequests.clear();
-        }
+    private async refreshPanel(state: TagPanelState) {
         const generation = ++state.refreshGeneration;
 
         try {
@@ -234,16 +262,28 @@ export class NativeTagBrowserFeature {
                 throw new Error(response.msg || this.plugin.i18n.nativeTagLoadFailed);
             }
 
-            state.tags = response.data.filter(validTagNode);
+            const tags = response.data.filter(validTagNode);
+            const tagsChanged = !tagTreesEqual(state.tags, tags);
+            const needsRender = tagsChanged || state.documentsInvalidated || state.root.hidden;
+            if (tagsChanged) {
+                state.documents.clear();
+                state.documentErrors.clear();
+                state.documentRequests.clear();
+            }
+            state.documentsInvalidated = false;
+            state.tags = tags;
             state.nativeHost.classList.add("stillmark-native-tags__native-host");
             state.root.hidden = false;
-            this.renderPanel(state);
+            if (needsRender) {
+                this.renderPanel(state);
+            }
         } catch {
             if (!this.isCurrent(state, generation)) {
                 return;
             }
-            state.root.hidden = true;
-            state.nativeHost.classList.remove("stillmark-native-tags__native-host");
+            if (state.root.hidden) {
+                state.nativeHost.classList.remove("stillmark-native-tags__native-host");
+            }
         }
     }
 
@@ -542,6 +582,15 @@ function tagNodeMatches(node: NativeTagNode, query: string): boolean {
 
 function flattenTagLabels(nodes: NativeTagNode[]): string[] {
     return nodes.flatMap((node) => [tagLabel(node), ...flattenTagLabels(node.children ?? [])]);
+}
+
+function tagTreesEqual(current: NativeTagNode[], next: NativeTagNode[]): boolean {
+    return current.length === next.length && current.every((node, index) => {
+        const nextNode = next[index];
+        return tagLabel(node) === tagLabel(nextNode) && tagName(node) === tagName(nextNode) &&
+            (node.count ?? 0) === (nextNode.count ?? 0) &&
+            tagTreesEqual(node.children ?? [], nextNode.children ?? []);
+    });
 }
 
 function validDocumentRow(value: unknown): value is TagDocumentRow & {id: string;} {
