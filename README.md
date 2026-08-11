@@ -24,11 +24,13 @@ SiYuan's native Tags panel becomes a collapsible tree. Click a tag to show its u
 
 Use `/` in a tag name to create hierarchy, for example `Clients/LG/SOP`. Opening a parent tag aggregates documents assigned to the parent itself or any descendant tag, with duplicate documents removed. Tags can also be filtered from the field at the top of the panel.
 
+Routine document updates refresh the tag data without rebuilding an unchanged tree, so expanded branches and the current filter remain stable. If SiYuan replaces the native tag-panel host during a rerender, the enhancement reconnects to the new host automatically.
+
 ### Stillmark theme enhancements
 
-When the Stillmark theme is active, external links load the source site's `/favicon.ico` directly with no referrer and fall back to the theme's neutral globe icon when unavailable. Bookmark groups remain single-line and compact; only duplicate titles receive a parent-path subtitle, with notebook and document-time context added when needed.
+When the Stillmark theme is active, external links load the source site's `/favicon.ico` directly with no referrer and fall back to the theme's neutral globe icon when unavailable. Bookmark groups remain single-line and compact; only duplicate titles receive a parent-path subtitle, with notebook and document-time context added when needed. Rendered block references are also classified as block or whole-document targets through cached, read-only lookups so the theme can present the two target types distinctly.
 
-These enhancements change only runtime presentation. They do not add elements, classes, or styles to document content and do not depend on a third-party favicon service.
+These enhancements affect only the current runtime presentation. They may annotate rendered nodes, but never write those markers, elements, classes, or styles into document content, and they do not depend on a third-party favicon service.
 
 ### Find in document
 
@@ -40,7 +42,7 @@ SiYuan's native `Command + P` global search is unchanged. The plugin does not in
 
 The document outline lists H1-H6 headings in document order and hierarchy, supports collapsible branches, and moves to a heading when clicked. Clicking or moving the caret in the editor, or scrolling into another section, highlights the matching heading and keeps it visible in the outline. The outline can use SiYuan's right dock or appear as a compact floating panel in the current editor; both the feature switch and display mode are persisted from the workbench.
 
-Right-dock mode reuses SiYuan's native dock area. Floating mode overlays only the active editor without changing the document width or global appearance. The outline refreshes after document switches and heading updates.
+Right-dock mode reuses SiYuan's native dock area. Floating mode overlays only the active editor without changing the document width or global appearance. The outline refreshes after document switches and heading updates without rebuilding an unchanged tree. Active highlighting spans the full row, leaf headings do not reserve an empty disclosure gutter, and child headings remain indented beyond their parent.
 
 ### Note path
 
@@ -117,7 +119,7 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 * The plugin does not directly read or write the workspace `data` directory.
 * The tag panel reads tags and related documents only through SiYuan's tag and SQL query APIs; expansion, filtering, and navigation do not modify tags or document content.
 * Find in document reads only the current document through SiYuan's search API and never changes block content.
-* Stillmark theme enhancements read bookmark paths through SiYuan's file-tree APIs and never change bookmarks or document content.
+* Stillmark theme enhancements read bookmark paths and reference-target block types through SiYuan's file-tree and SQL query APIs, annotate only rendered runtime nodes, and never change bookmarks or document content.
 * Document outline reads current-document headings only through SiYuan's native outline API and never changes documents or workspace files.
 * Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
 * Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.

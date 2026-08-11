@@ -7,8 +7,17 @@ const LINK_SELECTOR = [
     ".protyle-wysiwyg a[href]",
     ".protyle-wysiwyg span[data-type~='a'][data-href]",
 ].join(",");
+const BLOCK_REFERENCE_SELECTOR = [
+    ".b3-typography span[data-type~='block-ref'][data-id]",
+    ".protyle-wysiwyg span[data-type~='block-ref'][data-id]",
+].join(",");
+const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
+const REFERENCE_TARGET_ATTRIBUTE = "data-stillmark-ref-target";
+const REFERENCE_BATCH_SIZE = 200;
 const BOOKMARK_SELECTOR = ".sy__bookmark li[data-treetype='bookmark'][data-node-id]";
 const BOOKMARK_DUPLICATE_CLASS = "stillmark-bookmark--duplicate";
+
+type ReferenceTargetKind = "block" | "document";
 
 interface LinkEntry {
     faviconUrl: string;
@@ -37,16 +46,25 @@ interface DocumentPathData {
     path?: string;
 }
 
+interface BlockTypeRow {
+    id?: string;
+    type?: string;
+}
+
 export class ThemeEnhancementsFeature {
     private readonly bookmarkCache = new Map<string, BookmarkLocation | null>();
     private readonly bookmarkPending = new Map<string, Promise<BookmarkLocation | null>>();
     private readonly faviconByOrigin = new Map<string, FaviconState>();
     private readonly pendingImages = new Set<PendingImage>();
+    private readonly referenceTargetCache = new Map<string, ReferenceTargetKind>();
     private bookmarkRaf = 0;
     private disposed = false;
     private entries = new Map<string, LinkEntry>();
     private observer?: MutationObserver;
     private raf = 0;
+    private referenceRaf = 0;
+    private referenceScanRequested = false;
+    private referenceScanRunning = false;
     private ruleSignature = "";
     private style?: HTMLStyleElement;
 
@@ -67,12 +85,19 @@ export class ThemeEnhancementsFeature {
         document.removeEventListener("DOMContentLoaded", this.init);
         this.observer?.disconnect();
         this.bookmarkPending.clear();
+        this.referenceTargetCache.clear();
         document.querySelectorAll<HTMLElement>(BOOKMARK_SELECTOR).forEach(this.clearBookmarkAnnotation);
+        document.querySelectorAll<HTMLElement>(BLOCK_REFERENCE_SELECTOR).forEach((element) => {
+            element.removeAttribute(REFERENCE_TARGET_ATTRIBUTE);
+        });
         if (this.raf) {
             window.cancelAnimationFrame(this.raf);
         }
         if (this.bookmarkRaf) {
             window.cancelAnimationFrame(this.bookmarkRaf);
+        }
+        if (this.referenceRaf) {
+            window.cancelAnimationFrame(this.referenceRaf);
         }
         this.pendingImages.forEach(({image, timer}) => {
             window.clearTimeout(timer);
@@ -97,15 +122,19 @@ export class ThemeEnhancementsFeature {
                 this.bookmarkCache.clear();
                 this.scheduleBookmarkScan();
             }
+            if (mutations.some(this.mutationTouchesBlockReferences)) {
+                this.scheduleReferenceScan();
+            }
         });
         this.observer.observe(document.body, {
-            attributeFilter: ["data-href", "href"],
+            attributeFilter: ["data-href", "data-id", "data-type", "href"],
             attributes: true,
             childList: true,
             subtree: true,
         });
         this.scheduleLinkScan();
         this.scheduleBookmarkScan();
+        this.scheduleReferenceScan();
     };
 
     private normalizeUrl(rawValue: string) {
@@ -253,6 +282,91 @@ export class ThemeEnhancementsFeature {
         }
         return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => this.containsLink(node));
     };
+
+    private containsBlockReference(node: Node) {
+        return node instanceof Element &&
+            (node.matches(BLOCK_REFERENCE_SELECTOR) || node.querySelector(BLOCK_REFERENCE_SELECTOR));
+    }
+
+    private readonly mutationTouchesBlockReferences = (mutation: MutationRecord) => {
+        if (mutation.type === "attributes") {
+            return mutation.target instanceof Element && mutation.target.matches(BLOCK_REFERENCE_SELECTOR);
+        }
+        return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => this.containsBlockReference(node));
+    };
+
+    private async loadReferenceTargetKinds(ids: string[]) {
+        for (let index = 0; index < ids.length; index += REFERENCE_BATCH_SIZE) {
+            const batch = ids.slice(index, index + REFERENCE_BATCH_SIZE);
+            const quotedIds = batch.map((id) => `'${id}'`).join(", ");
+            const rows = await this.postJson<BlockTypeRow[]>("/api/query/sql", {
+                stmt: `SELECT id, type FROM blocks WHERE id IN (${quotedIds})`,
+            });
+            const kinds = new Map(
+                (Array.isArray(rows) ? rows : [])
+                    .filter((row) => typeof row?.id === "string")
+                    .map((row) => [row.id as string, row.type === "d" ? "document" : "block"] as const),
+            );
+            batch.forEach((id) => {
+                this.referenceTargetCache.set(id, kinds.get(id) || "block");
+            });
+        }
+    }
+
+    private async applyReferenceTargets() {
+        const references = [...document.querySelectorAll<HTMLElement>(BLOCK_REFERENCE_SELECTOR)];
+        const ids = [...new Set(references.map((element) => element.dataset.id || ""))]
+            .filter((id) => BLOCK_ID_PATTERN.test(id));
+        const uncachedIds = ids.filter((id) => !this.referenceTargetCache.has(id));
+
+        if (uncachedIds.length > 0) {
+            try {
+                await this.loadReferenceTargetKinds(uncachedIds);
+            } catch {
+                return;
+            }
+        }
+        if (this.disposed) {
+            return;
+        }
+
+        references.forEach((element) => {
+            const targetKind = this.referenceTargetCache.get(element.dataset.id || "");
+            if (!targetKind) {
+                element.removeAttribute(REFERENCE_TARGET_ATTRIBUTE);
+            } else if (element.dataset.stillmarkRefTarget !== targetKind) {
+                element.dataset.stillmarkRefTarget = targetKind;
+            }
+        });
+    }
+
+    private async scanReferences() {
+        if (this.referenceScanRunning) {
+            this.referenceScanRequested = true;
+            return;
+        }
+
+        this.referenceScanRunning = true;
+        try {
+            do {
+                this.referenceScanRequested = false;
+                await this.applyReferenceTargets();
+            } while (this.referenceScanRequested && !this.disposed);
+        } finally {
+            this.referenceScanRunning = false;
+        }
+    }
+
+    private readonly flushReferenceScan = () => {
+        this.referenceRaf = 0;
+        void this.scanReferences();
+    };
+
+    private scheduleReferenceScan() {
+        if (!this.disposed && !this.referenceRaf) {
+            this.referenceRaf = window.requestAnimationFrame(this.flushReferenceScan);
+        }
+    }
 
     private async postJson<T>(path: string, payload: Record<string, string>) {
         const response = await fetchSyncPost(path, payload);
