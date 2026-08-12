@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.4 — 2026-08-12
+
+### Changed
+
+* Tighten the document-outline disclosure gutter, heading marker, and spacing for fine pointers while retaining aligned rows, consistent nested indentation, and the 24px disclosure target for coarse pointers.
+
 ## 0.4.3 — 2026-08-11
 
 ### Fixed
