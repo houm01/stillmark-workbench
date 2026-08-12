@@ -649,7 +649,7 @@
 
   &__row {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-columns: 18px minmax(0, 1fr);
     align-items: center;
     min-width: 0;
     min-height: 30px;
@@ -664,8 +664,8 @@
 
   &__toggle {
     grid-column: 1;
-    flex: 0 0 24px;
-    width: 24px;
+    flex: 0 0 18px;
+    width: 18px;
     height: 28px;
     appearance: none;
     position: relative;
@@ -678,7 +678,7 @@
     &::before {
       position: absolute;
       inset-block-start: 10px;
-      inset-inline-start: 9px;
+      inset-inline-start: 6px;
       width: 6px;
       height: 6px;
       border-inline-end: 1.5px solid currentcolor;
@@ -714,7 +714,7 @@
     border-radius: 5px;
     background: transparent;
     color: var(--b3-theme-on-background);
-    gap: 4px;
+    gap: 2px;
     padding: 3px 7px 3px 0;
     font: inherit;
     text-align: start;
@@ -732,7 +732,7 @@
   }
 
   &__marker {
-    flex: 0 0 23px;
+    flex: 0 0 20px;
     color: var(--b3-theme-on-surface);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
@@ -786,6 +786,23 @@
 
     &[data-state="loading"] {
       color: var(--b3-theme-primary);
+    }
+  }
+}
+
+@media (pointer: coarse) {
+  .stillmark-document-outline {
+    &__row {
+      grid-template-columns: 24px minmax(0, 1fr);
+    }
+
+    &__toggle {
+      flex-basis: 24px;
+      width: 24px;
+
+      &::before {
+        inset-inline-start: 9px;
+      }
     }
   }
 }
