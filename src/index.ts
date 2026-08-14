@@ -13,6 +13,7 @@ import {DocumentFindFeature} from "./document-find";
 import {DocumentOutlineFeature} from "./document-outline";
 import {DocumentTreeFocusFeature} from "./document-tree-focus";
 import {FontSwitcherFeature} from "./font-switcher";
+import {HoverGuidesFeature} from "./hover-guides";
 import {InlineBacklinksFeature} from "./inline-backlinks";
 import {MindMapFeature} from "./mind-map";
 import {NativeTagBrowserFeature} from "./native-tag-browser";
@@ -55,6 +56,7 @@ export default class StillmarkWorkbench extends Plugin {
     private documentOutline?: DocumentOutlineFeature;
     private documentTreeFocus?: DocumentTreeFocusFeature;
     private fontSwitcher?: FontSwitcherFeature;
+    private hoverGuides?: HoverGuidesFeature;
     private inlineBacklinks?: InlineBacklinksFeature;
     private mindMap?: MindMapFeature;
     private nativeTagBrowser?: NativeTagBrowserFeature;
@@ -147,6 +149,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.themeEnhancements = new ThemeEnhancementsFeature();
         this.themeEnhancements.onload();
 
+        this.hoverGuides = new HoverGuidesFeature();
+        this.hoverGuides.onload();
+
         this.annotations = new AnnotationsFeature(this, this.workbenchPreferences);
         this.annotations.onload();
 
@@ -237,6 +242,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
         this.referenceAliasLabel?.onunload();
+        this.hoverGuides?.onunload();
         this.themeEnhancements?.onunload();
     }
 

@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.5 — 2026-08-14
+
+### Changed
+
+* Preserve Stillmark's continuous document-tree and editor-list hover guides with small state classes instead of relational hover selectors that force full-page style recalculation.
+
 ## 0.4.4 — 2026-08-12
 
 ### Changed
