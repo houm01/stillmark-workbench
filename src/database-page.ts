@@ -9,13 +9,16 @@ const DATABASE_CARD_SELECTOR = ".protyle-db-attr";
 const DATABASE_CARD_CLASS = "stillmark-database-card";
 const DATABASE_CARD_COLLAPSED_CLASS = "protyle-db-attr--collapsed";
 const DATABASE_CARD_APPLIED_ATTRIBUTE = "data-stillmark-database-collapse-applied";
-const RENDER_WATCH_MS = 1600;
+const DATABASE_CARD_UNAPPLIED_SELECTOR = `${DATABASE_CARD_SELECTOR}:not([${DATABASE_CARD_APPLIED_ATTRIBUTE}])`;
+const DATABASE_TOGGLE_SELECTOR = [
+    ":scope > .protyle-db-attr__header[data-type='toggle']",
+    ":scope > .protyle-db-attr__header > .protyle-db-attr__toggle[data-type='toggle']",
+].join(", ");
 
 interface EditorState {
     observer: MutationObserver;
     protyle: IProtyle;
     renderFrame?: number;
-    renderWatchTimer?: number;
     rootId: string;
 }
 
@@ -70,13 +73,17 @@ export class DatabasePageFeature {
 
         const state = this.states.get(protyle.element) ?? this.createState(protyle, rootId);
         state.protyle = protyle;
-        this.watchRender(state);
+        this.observeEditor(state);
         this.applyDatabaseCards(state);
     }
 
     private createState(protyle: IProtyle, rootId: string) {
         const state: EditorState = {
-            observer: new MutationObserver(() => this.scheduleApply(state)),
+            observer: new MutationObserver((mutations) => {
+                if (mutations.some(hasUnappliedDatabaseCard)) {
+                    this.scheduleApply(state);
+                }
+            }),
             protyle,
             rootId,
         };
@@ -84,17 +91,12 @@ export class DatabasePageFeature {
         return state;
     }
 
-    private watchRender(state: EditorState) {
+    private observeEditor(state: EditorState) {
         state.observer.disconnect();
-        window.clearTimeout(state.renderWatchTimer);
         state.observer.observe(state.protyle.element, {
             childList: true,
             subtree: true,
         });
-        state.renderWatchTimer = window.setTimeout(() => {
-            state.renderWatchTimer = undefined;
-            state.observer.disconnect();
-        }, RENDER_WATCH_MS);
     }
 
     private scheduleApply(state: EditorState) {
@@ -116,10 +118,8 @@ export class DatabasePageFeature {
         }
 
         state.protyle.element.querySelectorAll<HTMLElement>(DATABASE_CARD_SELECTOR).forEach((card) => {
-            const header = card.querySelector<HTMLButtonElement>(
-                ":scope > .protyle-db-attr__header[data-type='toggle']",
-            );
-            if (!header) {
+            const toggle = card.querySelector<HTMLElement>(DATABASE_TOGGLE_SELECTOR);
+            if (!toggle) {
                 return;
             }
 
@@ -129,17 +129,16 @@ export class DatabasePageFeature {
             }
 
             card.setAttribute(DATABASE_CARD_APPLIED_ATTRIBUTE, "true");
-            const isExpanded = header.getAttribute("aria-expanded") !== "false" &&
+            const isExpanded = toggle.getAttribute("aria-expanded") !== "false" &&
                 !card.classList.contains(DATABASE_CARD_COLLAPSED_CLASS);
             if (isExpanded) {
-                header.click();
+                toggle.click();
             }
         });
     }
 
     private destroyState(state: EditorState) {
         state.observer.disconnect();
-        window.clearTimeout(state.renderWatchTimer);
         if (state.renderFrame !== undefined) {
             window.cancelAnimationFrame(state.renderFrame);
         }
@@ -157,4 +156,19 @@ function isDocumentEditor(protyle: IProtyle, rootId: string) {
         !protyle.options.backlinkData &&
         Boolean(protyle.title?.element && protyle.contentElement)
     );
+}
+
+function hasUnappliedDatabaseCard(mutation: MutationRecord) {
+    if (
+        mutation.target instanceof Element &&
+        mutation.target.closest(DATABASE_CARD_UNAPPLIED_SELECTOR)
+    ) {
+        return true;
+    }
+    return [...mutation.addedNodes].some((node) => (
+        node instanceof Element && (
+            node.matches(DATABASE_CARD_UNAPPLIED_SELECTOR) ||
+            node.querySelector(DATABASE_CARD_UNAPPLIED_SELECTOR)
+        )
+    ));
 }

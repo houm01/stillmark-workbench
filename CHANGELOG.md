@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.6 — 2026-08-23
+
+### Fixed
+
+* Restore default collapsing for database-backed document field panels after SiYuan's native toggle markup changed, including panels that render asynchronously, while preserving manual expansion for the current editor.
+
 ## 0.4.5 — 2026-08-14
 
 ### Changed

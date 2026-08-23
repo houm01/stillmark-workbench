@@ -3097,11 +3097,13 @@ $stillmark-annotation-backgrounds: (
       color: var(--b3-theme-on-background);
     }
 
-    > .block__icon {
+    > .block__icon,
+    > .protyle-db-attr__toggle > .block__icon {
       opacity: 0.7;
     }
 
-    > .block__logo {
+    > .block__logo,
+    > .protyle-db-attr__toggle > .block__logo {
       color: var(--b3-theme-on-background);
       font-size: 13px;
       font-weight: 600;
