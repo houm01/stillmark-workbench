@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.7 — 2026-08-27
+
+### Changed
+
+* Keep the current-document outline closed by default on database-backed pages while preserving manual opening for the current page and restoring the previous presentation after leaving it.
+
 ## 0.4.6 — 2026-08-23
 
 ### Fixed
