@@ -16,6 +16,7 @@ import {
 } from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
+const DATABASE_CARD_SELECTOR = ".protyle-db-attr";
 const DOCUMENT_OUTLINE_DOCK_TYPE = "stillmark-document-outline";
 const OUTLINE_REFRESH_DELAY_MS = 180;
 const OPEN_HEADING_ACTIONS: TProtyleAction[] = [
@@ -46,6 +47,14 @@ export class DocumentOutlineFeature {
     private activeRootId = "";
     private boundEditorHost?: HTMLElement;
     private collapsedHeadingIds = new Set<string>();
+    private databaseContextHost?: HTMLElement;
+    private databaseContextPending = false;
+    private databaseContextRootId = "";
+    private databaseManualRootId = "";
+    private databaseObserver?: MutationObserver;
+    private databaseRestorePresentation = false;
+    private databaseSuppressedRootId = "";
+    private databaseSyncFrame?: number;
     private disposed = false;
     private dockRoot?: HTMLElement;
     private dockVisibilityTimer?: number;
@@ -102,12 +111,17 @@ export class DocumentOutlineFeature {
         this.bindEditorInteractions(detail.protyle.element);
         this.activeRootId = detail.protyle.block.rootID ?? "";
         this.activeHeadingId = "";
-        this.syncFloatingPanel();
+        this.bindDatabaseContext(detail.protyle.element, this.activeRootId);
+        this.scheduleDatabaseSync();
         this.scheduleRefresh(0);
     };
 
     private readonly destroyProtyleHandler = () => {
-        this.syncFloatingPanel();
+        const editor = getActiveEditor();
+        this.activeEditorHost = editor?.protyle.element;
+        this.activeRootId = editor?.protyle.block.rootID ?? "";
+        this.bindDatabaseContext(this.activeEditorHost, this.activeRootId);
+        this.scheduleDatabaseSync();
         this.scheduleRefresh(0);
     };
 
@@ -151,7 +165,8 @@ export class DocumentOutlineFeature {
     }
 
     onLayoutReady() {
-        this.syncPresentation(this.enabled && this.mode === "dock");
+        this.databaseRestorePresentation = this.enabled;
+        this.scheduleDatabaseSync();
         this.scheduleRefresh(0);
     }
 
@@ -161,6 +176,7 @@ export class DocumentOutlineFeature {
         this.destroyFloatingPanel();
         this.activeEditorHost = undefined;
         this.unbindEditorInteractions();
+        this.unbindDatabaseContext();
         window.clearTimeout(this.dockVisibilityTimer);
     }
 
@@ -173,6 +189,7 @@ export class DocumentOutlineFeature {
         this.enabled = enabled;
         if (enabled) {
             this.mount();
+            this.allowDatabaseOutlineForCurrentPage();
             this.syncPresentation(true);
             this.scheduleRefresh(0);
         } else {
@@ -193,6 +210,7 @@ export class DocumentOutlineFeature {
         await this.preferences.setDocumentOutlineMode(mode);
         this.mode = mode;
         this.activeHeadingId = "";
+        this.allowDatabaseOutlineForCurrentPage();
         this.syncPresentation(true);
         this.scheduleRefresh(0);
     }
@@ -211,6 +229,8 @@ export class DocumentOutlineFeature {
         this.activeEditorHost = editor?.protyle.element;
         this.bindEditorInteractions(this.activeEditorHost);
         this.activeRootId = editor?.protyle.block.rootID ?? "";
+        this.bindDatabaseContext(this.activeEditorHost, this.activeRootId);
+        this.scheduleDatabaseSync();
     }
 
     private unmount() {
@@ -221,27 +241,37 @@ export class DocumentOutlineFeature {
         this.plugin.eventBus.off("switch-protyle-mode", this.editorChangedHandler);
         this.plugin.eventBus.off("ws-main", this.webSocketHandler);
         this.unbindEditorInteractions();
+        this.unbindDatabaseContext();
         window.clearTimeout(this.refreshTimer);
         window.cancelAnimationFrame(this.editorScrollFrame);
         this.refreshGeneration += 1;
         this.headings = [];
         this.headingsRootId = "";
         this.activeHeadingId = "";
+        this.databaseContextRootId = "";
+        this.databaseManualRootId = "";
+        this.databaseRestorePresentation = false;
+        this.databaseSuppressedRootId = "";
         this.destroyFloatingPanel();
         this.renderPanels();
     }
 
     private syncPresentation(openDock = false) {
         const showDock = this.enabled && this.mode === "dock";
-        if (this.enabled && this.mode === "floating") {
+        const suppressForDatabase = this.isDatabaseOutlineSuppressed();
+        if (this.enabled && this.mode === "floating" && !suppressForDatabase) {
             this.syncFloatingPanel();
         } else {
             this.destroyFloatingPanel();
         }
-        this.syncDockVisibility(showDock, openDock && showDock);
+        this.syncDockVisibility(
+            showDock,
+            openDock && showDock && !suppressForDatabase,
+            showDock && suppressForDatabase,
+        );
     }
 
-    private syncDockVisibility(visible: boolean, open: boolean) {
+    private syncDockVisibility(visible: boolean, open: boolean, close = false) {
         window.clearTimeout(this.dockVisibilityTimer);
         this.dockVisibilityTimer = window.setTimeout(() => {
             this.dockVisibilityTimer = undefined;
@@ -249,7 +279,7 @@ export class DocumentOutlineFeature {
             const selector = `[data-type="${CSS.escape(type)}"]`;
             const items = [...document.querySelectorAll<HTMLElement>(selector)];
             items.forEach((element) => {
-                if (!visible && element.classList.contains("dock__item--active")) {
+                if ((!visible || close) && element.classList.contains("dock__item--active")) {
                     element.click();
                 }
                 element.classList.toggle("stillmark-feature-disabled", !visible);
@@ -268,7 +298,7 @@ export class DocumentOutlineFeature {
     }
 
     private syncFloatingPanel() {
-        if (!this.enabled || this.mode !== "floating") {
+        if (!this.enabled || this.mode !== "floating" || this.isDatabaseOutlineSuppressed()) {
             this.destroyFloatingPanel();
             return;
         }
@@ -296,6 +326,123 @@ export class DocumentOutlineFeature {
         this.floatingHost = host;
         this.floatingRoot = root;
         this.renderPanels();
+    }
+
+    private bindDatabaseContext(host: HTMLElement | undefined, rootId: string) {
+        const contextChanged = this.databaseContextHost !== host || this.databaseContextRootId !== rootId;
+        if (!contextChanged) {
+            return;
+        }
+
+        const restorePresentation = Boolean(this.databaseSuppressedRootId) &&
+            this.databaseRestorePresentation;
+        this.databaseObserver?.disconnect();
+        this.databaseContextHost = host;
+        this.databaseContextPending = Boolean(host && BLOCK_ID_PATTERN.test(rootId));
+        this.databaseContextRootId = rootId;
+        this.databaseManualRootId = "";
+        this.databaseRestorePresentation = restorePresentation;
+        this.databaseSuppressedRootId = "";
+        if (!host || !BLOCK_ID_PATTERN.test(rootId)) {
+            return;
+        }
+
+        this.databaseObserver = new MutationObserver((mutations) => {
+            if (mutations.some(mutationAffectsDatabaseCard)) {
+                this.scheduleDatabaseSync();
+            }
+        });
+        this.databaseObserver.observe(host, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
+    private unbindDatabaseContext() {
+        this.databaseObserver?.disconnect();
+        this.databaseObserver = undefined;
+        window.cancelAnimationFrame(this.databaseSyncFrame);
+        this.databaseSyncFrame = undefined;
+        this.databaseContextHost = undefined;
+        this.databaseContextPending = false;
+    }
+
+    private scheduleDatabaseSync() {
+        if (!this.mounted || this.disposed || this.databaseSyncFrame !== undefined) {
+            return;
+        }
+        this.databaseSyncFrame = window.requestAnimationFrame(() => {
+            this.databaseSyncFrame = undefined;
+            this.syncDatabaseOutlineDefault();
+        });
+    }
+
+    private syncDatabaseOutlineDefault() {
+        const host = this.databaseContextHost;
+        const rootId = this.databaseContextRootId;
+        if (!host?.isConnected || !BLOCK_ID_PATTERN.test(rootId)) {
+            this.databaseContextPending = false;
+            if (this.databaseRestorePresentation) {
+                this.databaseRestorePresentation = false;
+                this.syncPresentation(true);
+            } else {
+                this.syncFloatingPanel();
+            }
+            return;
+        }
+
+        const hasDatabaseCard = [...host.querySelectorAll<HTMLElement>(DATABASE_CARD_SELECTOR)]
+            .some((card) => card.offsetParent !== null);
+        this.databaseContextPending = false;
+        if (hasDatabaseCard && this.databaseManualRootId !== rootId) {
+            if (this.databaseSuppressedRootId !== rootId) {
+                this.databaseRestorePresentation = this.databaseRestorePresentation ||
+                    this.isCurrentPresentationOpen();
+                this.databaseSuppressedRootId = rootId;
+                this.syncPresentation();
+            }
+            return;
+        }
+        if (this.databaseSuppressedRootId === rootId) {
+            return;
+        }
+
+        if (this.databaseRestorePresentation) {
+            this.databaseRestorePresentation = false;
+            this.syncPresentation(true);
+        } else {
+            this.syncFloatingPanel();
+        }
+    }
+
+    private allowDatabaseOutlineForCurrentPage() {
+        const editor = getActiveEditor();
+        const host = editor?.protyle.element ?? this.activeEditorHost;
+        const rootId = editor?.protyle.block.rootID ?? this.activeRootId;
+        if (!host || !BLOCK_ID_PATTERN.test(rootId)) {
+            return;
+        }
+        this.databaseManualRootId = rootId;
+        this.databaseContextPending = false;
+        this.databaseRestorePresentation = false;
+        this.databaseSuppressedRootId = "";
+    }
+
+    private isDatabaseOutlineSuppressed() {
+        return this.databaseContextPending || (
+            Boolean(this.activeRootId) &&
+            this.databaseSuppressedRootId === this.activeRootId &&
+            this.databaseManualRootId !== this.activeRootId
+        );
+    }
+
+    private isCurrentPresentationOpen() {
+        if (this.mode === "floating") {
+            return Boolean(this.floatingRoot?.isConnected);
+        }
+        const type = `${this.plugin.name}${DOCUMENT_OUTLINE_DOCK_TYPE}`;
+        const selector = `[data-type="${CSS.escape(type)}"].dock__item--active`;
+        return Boolean(document.querySelector(selector));
     }
 
     private destroyFloatingPanel() {
@@ -778,6 +925,15 @@ function findHeadingPath(headings: OutlineHeading[], id: string): OutlineHeading
 
 function renderedHeadingElements(editor: HTMLElement) {
     return [...editor.querySelectorAll<HTMLElement>('[data-type="NodeHeading"][data-node-id]')];
+}
+
+function mutationAffectsDatabaseCard(mutation: MutationRecord) {
+    return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => (
+        node instanceof Element && (
+            node.matches(DATABASE_CARD_SELECTOR) ||
+            node.querySelector(DATABASE_CARD_SELECTOR)
+        )
+    ));
 }
 
 function formatHeadingLevel(level: number) {
