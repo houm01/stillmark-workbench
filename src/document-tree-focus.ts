@@ -8,6 +8,7 @@ import {
     getFrontend,
     showMessage,
 } from "siyuan";
+import {isDatabaseDocument} from "./database-page";
 import {WorkbenchPreferences} from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
@@ -15,19 +16,21 @@ const CONTEXT_MENU_VERTICAL_GAP = 20;
 
 export interface DocumentTreeFocusPreferences {
     shouldAutoLocateInTreeOnOpen(): Promise<boolean>;
+    shouldSkipDatabasePagesWhenAutoLocating(): Promise<boolean>;
     setAutoLocateInTreeOnOpen(enabled: boolean): Promise<void>;
+    setSkipDatabasePagesWhenAutoLocating(enabled: boolean): Promise<void>;
     openDocumentTreeFocusSettings(): void;
 }
 
 export class DocumentTreeFocusFeature {
     private enabled = true;
+    private locateFrame?: number;
     private locateRequestGeneration = 0;
     private mounted = false;
     private topBarElement?: HTMLElement;
 
-    private readonly editorChangedHandler = ({detail}: CustomEvent<{protyle: IProtyle;}>) => {
-        const generation = ++this.locateRequestGeneration;
-        void this.locateDocumentIfEnabled(detail.protyle, generation);
+    private readonly editorChangedHandler = () => {
+        this.scheduleAutoLocate();
     };
 
     private readonly contextMenuHandler = (event: MouseEvent) => {
@@ -86,17 +89,50 @@ export class DocumentTreeFocusFeature {
         if (!this.enabled || !await this.preferences.shouldAutoLocateInTreeOnOpen()) {
             return;
         }
-        if (generation !== this.locateRequestGeneration || currentProtyle()?.element !== protyle.element) {
+        const documentId = protyle.block.rootID ?? "";
+        if (
+            generation !== this.locateRequestGeneration ||
+            !isCurrentDocument(protyle, documentId)
+        ) {
             return;
         }
-        if (isDocumentFocusedInTree(protyle.block.rootID)) {
+        if (
+            await this.preferences.shouldSkipDatabasePagesWhenAutoLocating() &&
+            await isDatabaseDocument(protyle.element, documentId)
+        ) {
             return;
         }
-        this.locateProtyle(protyle);
+        if (
+            generation !== this.locateRequestGeneration ||
+            !isCurrentDocument(protyle, documentId)
+        ) {
+            return;
+        }
+        if (isDocumentFocusedInTree(documentId)) {
+            return;
+        }
+        this.locateDocument(documentId);
+    }
+
+    private scheduleAutoLocate() {
+        const generation = ++this.locateRequestGeneration;
+        if (this.locateFrame !== undefined) {
+            window.cancelAnimationFrame(this.locateFrame);
+        }
+        this.locateFrame = window.requestAnimationFrame(() => {
+            this.locateFrame = undefined;
+            const protyle = currentProtyle();
+            if (protyle) {
+                void this.locateDocumentIfEnabled(protyle, generation);
+            }
+        });
     }
 
     private async showSettingsMenu(x: number, y: number) {
-        const enabled = await this.preferences.shouldAutoLocateInTreeOnOpen();
+        const [enabled, skipDatabasePages] = await Promise.all([
+            this.preferences.shouldAutoLocateInTreeOnOpen(),
+            this.preferences.shouldSkipDatabasePagesWhenAutoLocating(),
+        ]);
         const menu = new Menu(`${this.plugin.name}-document-tree-focus`);
 
         menu.addItem({
@@ -104,6 +140,13 @@ export class DocumentTreeFocusFeature {
             label: this.plugin.i18n.documentTreeAutoFocus,
             click: () => {
                 void this.updateAutoLocatePreference(!enabled);
+            },
+        });
+        menu.addItem({
+            checked: skipDatabasePages,
+            label: this.plugin.i18n.documentTreeSkipDatabasePages,
+            click: () => {
+                void this.updateSkipDatabasePagesPreference(!skipDatabasePages);
             },
         });
         menu.addSeparator();
@@ -134,19 +177,56 @@ export class DocumentTreeFocusFeature {
         }
     }
 
+    private async updateSkipDatabasePagesPreference(enabled: boolean) {
+        try {
+            await this.preferences.setSkipDatabasePagesWhenAutoLocating(enabled);
+            showMessage(
+                enabled ?
+                    this.plugin.i18n.documentTreeSkipDatabasePagesEnabled :
+                    this.plugin.i18n.documentTreeSkipDatabasePagesDisabled,
+                3000,
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            showMessage(`${this.plugin.i18n.documentTreeSkipDatabasePagesSaveFailed}: ${message}`, 5000, "error");
+        }
+    }
+
     private locateCurrentDocument() {
+        void this.locateCurrentDocumentIfAllowed();
+    }
+
+    private async locateCurrentDocumentIfAllowed() {
         if (!this.enabled) {
             return;
         }
         const protyle = currentProtyle();
-        if (!protyle || !this.locateProtyle(protyle)) {
+        if (!protyle) {
+            showMessage(this.plugin.i18n.documentTreeFocusUnavailable, 4000, "error");
+            return;
+        }
+        const documentId = protyle.block.rootID ?? "";
+
+        if (
+            await this.preferences.shouldSkipDatabasePagesWhenAutoLocating() &&
+            await isDatabaseDocument(protyle.element, documentId)
+        ) {
+            if (isCurrentDocument(protyle, documentId)) {
+                showMessage(this.plugin.i18n.documentTreeDatabasePageSkipped, 4000);
+            }
+            return;
+        }
+
+        if (!this.enabled || !isCurrentDocument(protyle, documentId)) {
+            return;
+        }
+        if (!this.locateDocument(documentId)) {
             showMessage(this.plugin.i18n.documentTreeFocusUnavailable, 4000, "error");
         }
     }
 
-    private locateProtyle(protyle: IProtyle) {
-        const documentId = protyle.block.rootID;
-        if (!documentId || !BLOCK_ID_PATTERN.test(documentId)) {
+    private locateDocument(documentId: string) {
+        if (!BLOCK_ID_PATTERN.test(documentId)) {
             return false;
         }
         expandDocTree({id: documentId, isSetCurrent: true});
@@ -168,6 +248,10 @@ export class DocumentTreeFocusFeature {
         }
         this.mounted = false;
         ++this.locateRequestGeneration;
+        if (this.locateFrame !== undefined) {
+            window.cancelAnimationFrame(this.locateFrame);
+            this.locateFrame = undefined;
+        }
         this.plugin.eventBus.off("loaded-protyle-static", this.editorChangedHandler);
         this.plugin.eventBus.off("switch-protyle", this.editorChangedHandler);
     }
@@ -179,21 +263,33 @@ export class DocumentTreeFocusFeature {
 
 function currentProtyle() {
     const editors = getAllEditor();
-    const activeWindowEditor = editors.find((editor) => (
+    const activeWindowEditors = editors.filter((editor) => (
         editor.protyle.element.closest(".layout__wnd--active") && isVisible(editor.protyle)
     ));
-    if (activeWindowEditor) {
-        return activeWindowEditor.protyle;
-    }
-
     const selectedEditor = getActiveEditor(false);
-    return selectedEditor && isVisible(selectedEditor.protyle) ?
-        selectedEditor.protyle :
-        editors.find((editor) => isVisible(editor.protyle))?.protyle;
+    if (
+        selectedEditor &&
+        isVisible(selectedEditor.protyle) &&
+        (
+            activeWindowEditors.length === 0 ||
+            activeWindowEditors.some((editor) => editor.protyle.element === selectedEditor.protyle.element)
+        )
+    ) {
+        return selectedEditor.protyle;
+    }
+    return activeWindowEditors[0]?.protyle ?? editors.find((editor) => isVisible(editor.protyle))?.protyle;
 }
 
 function isVisible(protyle: IProtyle) {
     return document.contains(protyle.element) && protyle.element.getClientRects().length > 0;
+}
+
+function isCurrentDocument(protyle: IProtyle, documentId: string) {
+    const current = currentProtyle();
+    return (
+        current?.element === protyle.element &&
+        current.block.rootID === documentId
+    );
 }
 
 function isDocumentFocusedInTree(documentId?: string) {

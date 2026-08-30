@@ -70,9 +70,15 @@ Choose one template source:
 
 Create on startup can silently ensure that today's note exists when SiYuan opens without opening the document. Paths and templates continue to reuse the selected notebook's native SiYuan daily-note configuration.
 
+### Database relation sync
+
+The workbench can identify one unambiguous Device → Cabinet → Site → Customer database relation chain and persist each cabinet's site and customer into real relation fields on Device. Changes to devices, cabinets, or sites trigger a sync; while the client is running, a full reconciliation also runs every five minutes, with a manual Sync now action in the workbench.
+
+The feature proceeds only when names and relation targets form one strict match. Missing, duplicate, or mismatched fields stop the sync and surface an error instead of guessing.
+
 ### Document tree focus
 
-A manual locate button sits immediately to the right of the daily-note button and expands and selects the current note in the document tree. Automatic location can be enabled under “Document tree location” in plugin settings or toggled by right-clicking the locate button on desktop. The locate button does not provide a long-press menu.
+A manual locate button sits immediately to the right of the daily-note button and expands and selects the current note in the document tree. Automatic location can be enabled under “Document tree location” in plugin settings or toggled by right-clicking the locate button on desktop. “Keep database pages collapsed” is enabled by default: pages that contain a database and pages backed by one are skipped by both automatic and button-triggered location so large databases do not expand the left document tree; native tree controls remain unchanged. The locate button does not provide a long-press menu.
 
 ### Quick font switching
 
@@ -124,6 +130,7 @@ Build output is written to `dist/`, and the marketplace package is written to `p
 * Note paths read hierarchy only through SiYuan's file-tree APIs and never change documents or workspace files.
 * Linked pages reads explicit backlinks through SiYuan's reference APIs and renders them outside the editable document.
 * Daily notes are written only to the explicitly configured, currently open notebook.
+* Database relation sync writes only the detected Device relation fields for Site and Customer, then verifies the full result by reading it back.
 * The seven-day history menu is read-only and never creates missing historical notes.
 * Batch actions affect only blocks explicitly selected by the user.
 * PDF export reads only the current document and any subdocuments explicitly included by the user; it does not change note content.

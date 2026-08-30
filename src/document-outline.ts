@@ -10,13 +10,14 @@ import {
     openTab,
     showMessage,
 } from "siyuan";
+import {isDatabaseDocument} from "./database-page";
 import {
     DocumentOutlineMode,
     WorkbenchPreferences,
 } from "./workbench-preferences";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
-const DATABASE_CARD_SELECTOR = ".protyle-db-attr";
+const DATABASE_DOCUMENT_SELECTOR = ".protyle-db-attr, [data-type='NodeAttributeView']";
 const DOCUMENT_OUTLINE_DOCK_TYPE = "stillmark-document-outline";
 const OUTLINE_REFRESH_DELAY_MS = 180;
 const OPEN_HEADING_ACTIONS: TProtyleAction[] = [
@@ -48,6 +49,7 @@ export class DocumentOutlineFeature {
     private boundEditorHost?: HTMLElement;
     private collapsedHeadingIds = new Set<string>();
     private databaseContextHost?: HTMLElement;
+    private databaseContextGeneration = 0;
     private databaseContextPending = false;
     private databaseContextRootId = "";
     private databaseManualRootId = "";
@@ -337,6 +339,7 @@ export class DocumentOutlineFeature {
         const restorePresentation = Boolean(this.databaseSuppressedRootId) &&
             this.databaseRestorePresentation;
         this.databaseObserver?.disconnect();
+        this.databaseContextGeneration += 1;
         this.databaseContextHost = host;
         this.databaseContextPending = Boolean(host && BLOCK_ID_PATTERN.test(rootId));
         this.databaseContextRootId = rootId;
@@ -361,6 +364,7 @@ export class DocumentOutlineFeature {
     private unbindDatabaseContext() {
         this.databaseObserver?.disconnect();
         this.databaseObserver = undefined;
+        this.databaseContextGeneration += 1;
         window.cancelAnimationFrame(this.databaseSyncFrame);
         this.databaseSyncFrame = undefined;
         this.databaseContextHost = undefined;
@@ -373,11 +377,11 @@ export class DocumentOutlineFeature {
         }
         this.databaseSyncFrame = window.requestAnimationFrame(() => {
             this.databaseSyncFrame = undefined;
-            this.syncDatabaseOutlineDefault();
+            void this.syncDatabaseOutlineDefault(this.databaseContextGeneration);
         });
     }
 
-    private syncDatabaseOutlineDefault() {
+    private async syncDatabaseOutlineDefault(contextGeneration: number) {
         const host = this.databaseContextHost;
         const rootId = this.databaseContextRootId;
         if (!host?.isConnected || !BLOCK_ID_PATTERN.test(rootId)) {
@@ -391,10 +395,16 @@ export class DocumentOutlineFeature {
             return;
         }
 
-        const hasDatabaseCard = [...host.querySelectorAll<HTMLElement>(DATABASE_CARD_SELECTOR)]
-            .some((card) => card.offsetParent !== null);
+        const hasDatabaseDocument = await isDatabaseDocument(host, rootId);
+        if (
+            contextGeneration !== this.databaseContextGeneration ||
+            host !== this.databaseContextHost ||
+            rootId !== this.databaseContextRootId
+        ) {
+            return;
+        }
         this.databaseContextPending = false;
-        if (hasDatabaseCard && this.databaseManualRootId !== rootId) {
+        if (hasDatabaseDocument && this.databaseManualRootId !== rootId) {
             if (this.databaseSuppressedRootId !== rootId) {
                 this.databaseRestorePresentation = this.databaseRestorePresentation ||
                     this.isCurrentPresentationOpen();
@@ -403,16 +413,9 @@ export class DocumentOutlineFeature {
             }
             return;
         }
-        if (this.databaseSuppressedRootId === rootId) {
-            return;
-        }
-
-        if (this.databaseRestorePresentation) {
-            this.databaseRestorePresentation = false;
-            this.syncPresentation(true);
-        } else {
-            this.syncFloatingPanel();
-        }
+        this.databaseRestorePresentation = false;
+        this.databaseSuppressedRootId = "";
+        this.syncPresentation(true);
     }
 
     private allowDatabaseOutlineForCurrentPage() {
@@ -930,8 +933,8 @@ function renderedHeadingElements(editor: HTMLElement) {
 function mutationAffectsDatabaseCard(mutation: MutationRecord) {
     return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => (
         node instanceof Element && (
-            node.matches(DATABASE_CARD_SELECTOR) ||
-            node.querySelector(DATABASE_CARD_SELECTOR)
+            node.matches(DATABASE_DOCUMENT_SELECTOR) ||
+            node.querySelector(DATABASE_DOCUMENT_SELECTOR)
         )
     ));
 }
