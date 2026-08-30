@@ -2,6 +2,20 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.8 — 2026-08-31
+
+### Added
+
+* Add background database relation sync that materializes Device → Cabinet → Site → Customer chains as real Device relations, with change-triggered and five-minute reconciliation, manual sync, strict discovery, and full readback verification.
+
+### Changed
+
+* Keep database pages out of both automatic and button-triggered document-tree location by default, preventing large databases from expanding the left tree.
+
+### Fixed
+
+* Restore automatic document-tree location for ordinary documents when SiYuan renders an empty database-attribute placeholder.
+
 ## 0.4.7 — 2026-08-27
 
 ### Changed

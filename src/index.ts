@@ -8,6 +8,7 @@ import {
 import {AnnotationsFeature} from "./annotations";
 import {DailyNotesFeature} from "./daily-notes";
 import {DatabasePageFeature} from "./database-page";
+import {DatabaseRelationSyncFeature} from "./database-relation-sync";
 import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {DocumentFindFeature} from "./document-find";
 import {DocumentOutlineFeature} from "./document-outline";
@@ -50,6 +51,7 @@ const ROLE_DEFINITIONS: RoleDefinition[] = [
 export default class StillmarkWorkbench extends Plugin {
     private annotations?: AnnotationsFeature;
     private dailyNotes?: DailyNotesFeature;
+    private databaseRelationSync?: DatabaseRelationSyncFeature;
     private databasePage?: DatabasePageFeature;
     private documentBreadcrumb?: DocumentBreadcrumbFeature;
     private documentFind?: DocumentFindFeature;
@@ -140,6 +142,9 @@ export default class StillmarkWorkbench extends Plugin {
         this.dailyNotes = new DailyNotesFeature(this, this.workbenchPreferences);
         this.dailyNotes.onload();
 
+        this.databaseRelationSync = new DatabaseRelationSyncFeature(this, this.workbenchPreferences);
+        this.databaseRelationSync.onload();
+
         this.databasePage = new DatabasePageFeature(this);
         this.databasePage.onload();
 
@@ -190,6 +195,7 @@ export default class StillmarkWorkbench extends Plugin {
             this,
             this.annotations,
             this.dailyNotes,
+            this.databaseRelationSync,
             this.documentFind,
             this.documentOutline,
             this.documentBreadcrumb,
@@ -241,6 +247,7 @@ export default class StillmarkWorkbench extends Plugin {
         this.nativeTagBrowser?.onunload();
         this.pdfExport?.onunload();
         this.dailyNotes?.onunload();
+        this.databaseRelationSync?.onunload();
         this.referenceAliasLabel?.onunload();
         this.hoverGuides?.onunload();
         this.themeEnhancements?.onunload();

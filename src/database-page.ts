@@ -1,11 +1,13 @@
 import {
     IProtyle,
     Plugin,
+    fetchSyncPost,
     getAllEditor,
 } from "siyuan";
 
 const BLOCK_ID_PATTERN = /^\d{14}-[a-z0-9]{7}$/;
 const DATABASE_CARD_SELECTOR = ".protyle-db-attr";
+const DATABASE_BLOCK_SELECTOR = "[data-type='NodeAttributeView']";
 const DATABASE_CARD_CLASS = "stillmark-database-card";
 const DATABASE_CARD_COLLAPSED_CLASS = "protyle-db-attr--collapsed";
 const DATABASE_CARD_APPLIED_ATTRIBUTE = "data-stillmark-database-collapse-applied";
@@ -156,6 +158,35 @@ function isDocumentEditor(protyle: IProtyle, rootId: string) {
         !protyle.options.backlinkData &&
         Boolean(protyle.title?.element && protyle.contentElement)
     );
+}
+
+export async function isDatabaseDocument(element: ParentNode, rootId: string) {
+    if (element.querySelector(DATABASE_BLOCK_SELECTOR)) {
+        return true;
+    }
+
+    if (!BLOCK_ID_PATTERN.test(rootId)) {
+        return false;
+    }
+
+    try {
+        const databaseBlockResponse = await fetchSyncPost("/api/query/sql", {
+            stmt: [
+                `SELECT 1 AS present FROM blocks WHERE root_id = '${rootId}' AND type = 'av'`,
+                "UNION ALL",
+                `SELECT 1 AS present FROM attributes WHERE block_id = '${rootId}'`,
+                "AND name = 'custom-avs' AND value NOT IN ('', '[]', '{}', 'null')",
+                "LIMIT 1",
+            ].join(" "),
+        });
+        return (
+            databaseBlockResponse.code === 0 &&
+            Array.isArray(databaseBlockResponse.data) &&
+            databaseBlockResponse.data.length > 0
+        );
+    } catch {
+        return false;
+    }
 }
 
 function hasUnappliedDatabaseCard(mutation: MutationRecord) {

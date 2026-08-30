@@ -167,6 +167,14 @@ export class DailyNotesFeature {
         return this.settings.setAutoLocateInTreeOnOpen(enabled);
     }
 
+    shouldSkipDatabasePagesWhenAutoLocating() {
+        return this.settings.shouldSkipDatabasePagesWhenAutoLocating();
+    }
+
+    setSkipDatabasePagesWhenAutoLocating(enabled: boolean) {
+        return this.settings.setSkipDatabasePagesWhenAutoLocating(enabled);
+    }
+
     async isEnabled() {
         return this.preferences.isFeatureEnabled("dailyNotes");
     }

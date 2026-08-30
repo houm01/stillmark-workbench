@@ -8,6 +8,7 @@ interface StoredWorkbenchPreferences {
     annotationContinuousMode?: boolean;
     annotationsEnabled?: boolean;
     blockRolesEnabled?: boolean;
+    databaseRelationSyncEnabled?: boolean;
     dailyNotesEnabled?: boolean;
     documentBreadcrumbEnabled?: boolean;
     documentFindEnabled?: boolean;
@@ -25,6 +26,7 @@ interface WorkbenchPreferencesState {
     annotationContinuousMode: boolean;
     annotationsEnabled: boolean;
     blockRolesEnabled: boolean;
+    databaseRelationSyncEnabled: boolean;
     dailyNotesEnabled: boolean;
     documentBreadcrumbEnabled: boolean;
     documentFindEnabled: boolean;
@@ -42,6 +44,7 @@ type BooleanPreferenceKey =
     | "annotationContinuousMode"
     | "annotationsEnabled"
     | "blockRolesEnabled"
+    | "databaseRelationSyncEnabled"
     | "dailyNotesEnabled"
     | "documentBreadcrumbEnabled"
     | "documentFindEnabled"
@@ -55,6 +58,7 @@ type BooleanPreferenceKey =
 export type WorkbenchFeature =
     | "annotations"
     | "blockRoles"
+    | "databaseRelationSync"
     | "dailyNotes"
     | "documentBreadcrumb"
     | "documentFind"
@@ -68,6 +72,7 @@ export type WorkbenchFeature =
 const FEATURE_PREFERENCE_KEYS: Record<WorkbenchFeature, BooleanPreferenceKey> = {
     annotations: "annotationsEnabled",
     blockRoles: "blockRolesEnabled",
+    databaseRelationSync: "databaseRelationSyncEnabled",
     dailyNotes: "dailyNotesEnabled",
     documentBreadcrumb: "documentBreadcrumbEnabled",
     documentFind: "documentFindEnabled",
@@ -83,6 +88,7 @@ const DEFAULT_PREFERENCES: WorkbenchPreferencesState = {
     annotationContinuousMode: false,
     annotationsEnabled: true,
     blockRolesEnabled: true,
+    databaseRelationSyncEnabled: true,
     dailyNotesEnabled: true,
     documentBreadcrumbEnabled: true,
     documentFindEnabled: true,
@@ -259,6 +265,7 @@ function normalizePreferences(stored?: StoredWorkbenchPreferences): WorkbenchPre
         annotationContinuousMode: stored?.annotationContinuousMode === true,
         annotationsEnabled: stored?.annotationsEnabled !== false,
         blockRolesEnabled: stored?.blockRolesEnabled !== false,
+        databaseRelationSyncEnabled: stored?.databaseRelationSyncEnabled !== false,
         dailyNotesEnabled: stored?.dailyNotesEnabled !== false,
         documentBreadcrumbEnabled: stored?.documentBreadcrumbEnabled !== false,
         documentFindEnabled: stored?.documentFindEnabled !== false,

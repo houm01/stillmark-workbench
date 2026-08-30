@@ -6,6 +6,7 @@ import {
 } from "siyuan";
 import {AnnotationsFeature} from "./annotations";
 import {DailyNotesFeature} from "./daily-notes";
+import {DatabaseRelationSyncFeature} from "./database-relation-sync";
 import {DocumentBreadcrumbFeature} from "./document-breadcrumb";
 import {DocumentFindFeature} from "./document-find";
 import {DocumentOutlineFeature} from "./document-outline";
@@ -74,6 +75,7 @@ export class WorkbenchDialogFeature {
         private readonly plugin: Plugin,
         private readonly annotations: AnnotationsFeature,
         private readonly dailyNotes: DailyNotesFeature,
+        private readonly databaseRelationSync: DatabaseRelationSyncFeature,
         private readonly documentFind: DocumentFindFeature,
         private readonly documentOutline: DocumentOutlineFeature,
         private readonly documentBreadcrumb: DocumentBreadcrumbFeature,
@@ -89,7 +91,9 @@ export class WorkbenchDialogFeature {
         const [
             dailyNotesStatus,
             autoLocateInTree,
+            skipDatabasePagesWhenAutoLocating,
             dailyNotesEnabled,
+            databaseRelationSyncEnabled,
             documentTreeFocusEnabled,
             documentFindEnabled,
             documentOutlineEnabled,
@@ -104,7 +108,9 @@ export class WorkbenchDialogFeature {
         ] = await Promise.all([
             this.dailyNotes.getConfigurationStatus().catch(() => "unavailable" as const),
             this.dailyNotes.shouldAutoLocateInTreeOnOpen().catch(() => false),
+            this.dailyNotes.shouldSkipDatabasePagesWhenAutoLocating().catch(() => true),
             this.dailyNotes.isEnabled(),
+            this.databaseRelationSync.isEnabled(),
             this.documentTreeFocus.isEnabled(),
             this.documentFind.isEnabled(),
             this.documentOutline.isEnabled(),
@@ -165,6 +171,47 @@ export class WorkbenchDialogFeature {
             controls: [dailyNotesToggle, dailyNotesButton],
         }));
 
+        const relationSyncStatus = this.databaseRelationSync.getStatusPresentation();
+        const relationSyncStatusElement = this.createStatus(relationSyncStatus.label, relationSyncStatus.state);
+        const relationSyncButton = this.createButton(this.plugin.i18n.databaseRelationSyncNow, () => {
+            relationSyncButton.disabled = true;
+            this.syncStatus(
+                relationSyncStatusElement,
+                this.plugin.i18n.databaseRelationSyncRunning,
+                "neutral",
+            );
+            void this.databaseRelationSync.syncNow().then(() => {
+                const status = this.databaseRelationSync.getStatusPresentation();
+                this.syncStatus(relationSyncStatusElement, status.label, status.state);
+                showMessage(status.label, 4000);
+            }).catch((error) => {
+                const status = this.databaseRelationSync.getStatusPresentation();
+                this.syncStatus(relationSyncStatusElement, status.label, status.state);
+                showMessage(
+                    `${this.plugin.i18n.databaseRelationSyncFailed}: ${errorMessage(error)}`,
+                    5000,
+                    "error",
+                );
+            }).finally(() => {
+                relationSyncButton.disabled = false;
+            });
+        });
+        relationSyncButton.disabled = !databaseRelationSyncEnabled;
+        const relationSyncToggle = this.createFeatureToggle(
+            "databaseRelationSync",
+            this.plugin.i18n.databaseRelationSyncTool,
+            databaseRelationSyncEnabled,
+            (enabled) => this.databaseRelationSync.setEnabled(enabled),
+            [relationSyncButton],
+            featureToggles,
+        );
+        root.append(this.createTool({
+            title: this.plugin.i18n.databaseRelationSyncTool,
+            description: this.plugin.i18n.databaseRelationSyncToolDescription,
+            statusElement: relationSyncStatusElement,
+            controls: [relationSyncToggle, relationSyncButton],
+        }));
+
         const autoLocateControl = this.createToggleControl({
             ariaLabel: this.plugin.i18n.documentTreeAutoFocus,
             disabled: !documentTreeFocusEnabled,
@@ -174,6 +221,16 @@ export class WorkbenchDialogFeature {
             label: this.plugin.i18n.autoLocate,
             saveFailedMessage: this.plugin.i18n.documentTreeAutoFocusSaveFailed,
             setEnabled: (enabled) => this.dailyNotes.setAutoLocateInTreeOnOpen(enabled),
+        });
+        const skipDatabasePagesControl = this.createToggleControl({
+            ariaLabel: this.plugin.i18n.documentTreeSkipDatabasePages,
+            disabled: !documentTreeFocusEnabled,
+            disabledMessage: this.plugin.i18n.documentTreeSkipDatabasePagesDisabled,
+            enabled: skipDatabasePagesWhenAutoLocating,
+            enabledMessage: this.plugin.i18n.documentTreeSkipDatabasePagesEnabled,
+            label: this.plugin.i18n.documentTreeSkipDatabasePages,
+            saveFailedMessage: this.plugin.i18n.documentTreeSkipDatabasePagesSaveFailed,
+            setEnabled: (enabled) => this.dailyNotes.setSkipDatabasePagesWhenAutoLocating(enabled),
         });
         const documentTreeButton = this.createButton(this.plugin.i18n.configure, () => {
             dialog.destroy();
@@ -186,13 +243,13 @@ export class WorkbenchDialogFeature {
             this.plugin.i18n.documentTreeFocusSettings,
             documentTreeFocusEnabled,
             (enabled) => this.documentTreeFocus.setEnabled(enabled),
-            [autoLocateControl],
+            [autoLocateControl, skipDatabasePagesControl],
             featureToggles,
         );
         root.append(this.createTool({
             title: this.plugin.i18n.documentTreeFocusSettings,
             description: this.plugin.i18n.documentTreeFocusToolDescription,
-            controls: [documentTreeToggle, autoLocateControl, documentTreeButton],
+            controls: [documentTreeToggle, autoLocateControl, skipDatabasePagesControl, documentTreeButton],
         }));
 
         const documentFindToggle = this.createFeatureToggle(

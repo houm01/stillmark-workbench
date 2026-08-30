@@ -1,6 +1,6 @@
 {
   "name": "stillmark-workbench",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "A quiet collection of focused tools for SiYuan Note.",
   "main": "index.js",
   "scripts": {
