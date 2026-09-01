@@ -98,9 +98,7 @@ export default class StillmarkWorkbench extends Plugin {
     };
 
     updateProtyleToolbar(toolbar: Parameters<Plugin["updateProtyleToolbar"]>[0]) {
-        if (!this.annotations?.isEnabledCached()) {
-            return toolbar;
-        }
+        // SiYuan calls this before onload to register keymap entries, so keep the result stable.
         return [
             ...toolbar,
             {
