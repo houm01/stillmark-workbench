@@ -2,6 +2,12 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.9 — 2026-09-01
+
+### Fixed
+
+* Keep the annotation toolbar item registered consistently during plugin construction so SiYuan's shortcut settings can open without a missing keymap entry.
+
 ## 0.4.8 — 2026-08-31
 
 ### Added
