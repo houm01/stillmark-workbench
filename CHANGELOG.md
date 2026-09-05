@@ -2,6 +2,14 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.10 — 2026-09-05
+
+### Fixed
+
+* Restore automatic document-tree location when the focused row is outside the visible area or hidden under a collapsed ancestor, while keeping already visible rows stable.
+* Locate the active document after layout initialization and feature re-enablement, and preserve its identity across asynchronous preference checks.
+* Preserve database-page exclusions for automatic and button-triggered location.
+
 ## 0.4.9 — 2026-09-01
 
 ### Fixed

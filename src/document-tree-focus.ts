@@ -63,6 +63,7 @@ export class DocumentTreeFocusFeature {
         if (!isMobile()) {
             this.topBarElement.addEventListener("contextmenu", this.contextMenuHandler);
         }
+        this.scheduleAutoLocate();
     }
 
     onunload() {
@@ -79,6 +80,7 @@ export class DocumentTreeFocusFeature {
         this.enabled = enabled;
         if (enabled) {
             this.mount();
+            this.scheduleAutoLocate();
         } else {
             this.unmount();
         }
@@ -86,10 +88,10 @@ export class DocumentTreeFocusFeature {
     }
 
     private async locateDocumentIfEnabled(protyle: IProtyle, generation: number) {
+        const documentId = protyle.block.rootID ?? "";
         if (!this.enabled || !await this.preferences.shouldAutoLocateInTreeOnOpen()) {
             return;
         }
-        const documentId = protyle.block.rootID ?? "";
         if (
             generation !== this.locateRequestGeneration ||
             !isCurrentDocument(protyle, documentId)
@@ -108,7 +110,7 @@ export class DocumentTreeFocusFeature {
         ) {
             return;
         }
-        if (isDocumentFocusedInTree(documentId)) {
+        if (revealFocusedDocumentInTree(documentId)) {
             return;
         }
         this.locateDocument(documentId);
@@ -292,13 +294,34 @@ function isCurrentDocument(protyle: IProtyle, documentId: string) {
     );
 }
 
-function isDocumentFocusedInTree(documentId?: string) {
+function revealFocusedDocumentInTree(documentId?: string) {
     if (!documentId || !BLOCK_ID_PATTERN.test(documentId)) {
         return false;
     }
-    return Boolean(document.querySelector(
+    const focusedItem = document.querySelector<HTMLElement>(
         `.file-tree .b3-list-item--focus[data-node-id="${CSS.escape(documentId)}"]`,
-    ));
+    );
+    if (!focusedItem || focusedItem.getClientRects().length === 0) {
+        return false;
+    }
+
+    // Focus survives scrolling and ancestor collapse; only rendered rows can be revealed directly.
+    for (let parent = focusedItem.parentElement; parent; parent = parent.parentElement) {
+        if (parent.scrollHeight <= parent.clientHeight || !/auto|scroll/.test(getComputedStyle(parent).overflowY)) {
+            continue;
+        }
+        const row = focusedItem.getBoundingClientRect();
+        const viewport = parent.getBoundingClientRect();
+        const top = viewport.top + parent.clientTop;
+        const bottom = top + parent.clientHeight;
+        if (row.top < top) {
+            parent.scrollTop += row.top - top;
+        } else if (row.bottom > bottom) {
+            parent.scrollTop += row.bottom - bottom;
+        }
+        break;
+    }
+    return true;
 }
 
 function isMobile() {
