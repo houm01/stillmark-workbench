@@ -26,6 +26,7 @@ export class DocumentTreeFocusFeature {
     private enabled = true;
     private locateFrame?: number;
     private locateRequestGeneration = 0;
+    private locateInFlight?: Promise<void>;
     private mounted = false;
     private topBarElement?: HTMLElement;
 
@@ -92,6 +93,9 @@ export class DocumentTreeFocusFeature {
         if (!this.enabled || !await this.preferences.shouldAutoLocateInTreeOnOpen()) {
             return;
         }
+        // A previous native expansion can still change focus after a tab switch.
+        // Wait before treating the current tree focus as the final result.
+        await this.locateInFlight;
         if (
             generation !== this.locateRequestGeneration ||
             !isCurrentDocument(protyle, documentId)
@@ -113,7 +117,7 @@ export class DocumentTreeFocusFeature {
         if (revealFocusedDocumentInTree(documentId)) {
             return;
         }
-        this.locateDocument(documentId);
+        await this.locateDocument(documentId);
     }
 
     private scheduleAutoLocate() {
@@ -222,17 +226,40 @@ export class DocumentTreeFocusFeature {
         if (!this.enabled || !isCurrentDocument(protyle, documentId)) {
             return;
         }
-        if (!this.locateDocument(documentId)) {
+        if (!await this.locateDocument(documentId) && isCurrentDocument(protyle, documentId)) {
             showMessage(this.plugin.i18n.documentTreeFocusUnavailable, 4000, "error");
         }
     }
 
-    private locateDocument(documentId: string) {
+    private async locateDocument(documentId: string) {
         if (!BLOCK_ID_PATTERN.test(documentId)) {
             return false;
         }
-        expandDocTree({id: documentId, isSetCurrent: true});
-        return true;
+        while (this.locateInFlight) {
+            await this.locateInFlight;
+        }
+        if (!this.enabled || currentProtyle()?.block.rootID !== documentId) {
+            return false;
+        }
+        if (revealFocusedDocumentInTree(documentId)) {
+            return true;
+        }
+        // The desktop implementation returns a Promise although the SDK types say void.
+        const pending = Promise.resolve().then(() => expandDocTree({id: documentId, isSetCurrent: true}));
+        // Keep the shared barrier resolved even if the native request fails.
+        this.locateInFlight = pending.catch(() => {});
+        try {
+            await pending;
+            return true;
+        } catch (error) {
+            console.warn("Stillmark document-tree location failed", error);
+            return false;
+        } finally {
+            this.locateInFlight = undefined;
+            if (this.enabled && currentProtyle()?.block.rootID !== documentId) {
+                this.scheduleAutoLocate();
+            }
+        }
     }
 
     private mount() {
