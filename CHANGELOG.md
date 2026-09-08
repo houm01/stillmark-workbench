@@ -2,6 +2,13 @@
 
 This file records user-visible changes to Stillmark Workbench.
 
+## 0.4.11 — 2026-09-08
+
+### Fixed
+
+* Prevent delayed document-tree location requests from restoring focus to a previous document after switching tabs. Wait for ongoing expansions and reconcile the active document when they finish.
+* Handle native location failures without blocking subsequent requests or displaying stale errors after a document switch.
+
 ## 0.4.10 — 2026-09-05
 
 ### Fixed
